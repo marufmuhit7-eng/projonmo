@@ -1,20 +1,21 @@
 {
-  "name": "projonmo-uttorbongo-heritage-fest",
-  "version": "1.0.0",
+  "name": "projonmo-heritage-fest",
+  "version": "2.0.0",
   "private": true,
-  "description": "Uttarbanga Heritage Fest — static bilingual (Bangla/English) event site with registration, quiz, leaderboard and organizer panel. Presented by Projonmo Foundation.",
+  "description": "Uttarbanga Heritage Fest — monorepo. src/ is the source of truth; tools/build.py generates two independent Vercel deployments: public-site/ and admin-panel/.",
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
     "url": "https://github.com/marufmuhit7-eng/projonmo.git"
   },
   "scripts": {
-    "build": "echo \"Static site — no build step required.\"",
-    "dev": "python3 -m http.server 8000 --bind 0.0.0.0",
-    "test": "node tools/storage.test.js && node tools/page.test.js",
+    "build": "python3 tools/build.py",
+    "dev": "npm run dev:public & npm run dev:admin & wait",
+    "dev:public": "cd public-site && python3 -m http.server 8000 --bind 0.0.0.0",
+    "dev:admin": "cd admin-panel && python3 -m http.server 8001 --bind 0.0.0.0",
+    "test": "node tools/storage.test.js && node tools/apps.test.js",
     "test:storage": "node tools/storage.test.js",
-    "test:page": "node tools/page.test.js",
-    "split": "python3 tools/split.py"
+    "test:apps": "node tools/apps.test.js"
   },
   "keywords": [
     "static-site",

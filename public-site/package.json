@@ -1,0 +1,11 @@
+{
+  "name": "heritage-fest-public-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Uttarbanga Heritage Fest — public website (registration, quiz, leaderboard). Generated from ../src by tools/build.py; do not edit these files directly.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "echo \"Static site — no build step required.\"",
+    "dev": "python3 -m http.server 8000 --bind 0.0.0.0"
+  }
+}

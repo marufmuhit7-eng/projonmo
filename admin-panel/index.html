@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>এডমিন প্যানেল | Heritage Fest Admin</title>
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<meta name="googlebot" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#242C3F">
+<link rel="icon" href="./images/heritage-fest-logo-708214d0.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tiro+Bangla:ital@0;1&family=Hind+Siliguri:wght@400;500;600;700&family=Spectral:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./css/styles.css">
+</head>
+<body class="lang-bn">
+
+<nav class="topnav">
+  <div class="nav-inner">
+    <div class="brand">
+      <img src="./images/heritage-fest-logo-708214d0.jpg" alt="" style="width:38px;height:38px;border-radius:50%;object-fit:cover;object-position:50% 42%;border:2px solid var(--brass);box-shadow:0 0 0 2px var(--indigo-deep);flex:0 0 auto;">
+      <span class="bn">হেরিটেজ ফেস্ট — এডমিন</span><span class="en">Heritage Fest — Admin</span>
+    </div>
+    <button class="lang-toggle" id="langToggle">EN / বাং</button>
+  </div>
+</nav>
+
+<section id="admin" class="active">
+  <div class="wrap">
+    <div class="eyebrow"><span class="bn">আয়োজক প্যানেল</span><span class="en">Organizer Panel</span></div>
+    <h2 style="margin-top:0;"><span class="bn">এডমিন</span><span class="en">Admin</span></h2>
+
+    <div id="adminLogin" class="form-box">
+      <p class="bn" style="margin-top:0;color:rgba(36,28,21,0.75);">এই অংশ শুধুমাত্র আয়োজক টিমের জন্য। পাসওয়ার্ড দিয়ে লগইন করো।</p>
+      <p class="en" style="margin-top:0;color:rgba(36,28,21,0.75);">This section is for organizers only. Log in with the admin password.</p>
+      <label><span class="bn">পাসওয়ার্ড</span><span class="en">Password</span></label>
+      <input type="text" id="adminPassInput" placeholder="••••••••" style="font-family:var(--f-mono);">
+      <button class="btn btn-primary" style="margin-top:16px;" onclick="adminLogin()"><span class="bn">লগইন</span><span class="en">Log In</span></button>
+      <div id="adminLoginMsg"></div>
+      <p class="small-note bn">⚠️ এটি একটি স্ট্যাটিক ওয়েবসাইট, তাই এই পাসওয়ার্ড-সুরক্ষা মূলত সাধারণ দর্শকদের ঠেকানোর জন্য — সত্যিকারের নিরাপদ অথেন্টিকেশন নয়। কোডেই পাসওয়ার্ড লেখা থাকে (ADMIN_PASSWORD ভেরিয়েবল), চাইলে বদলে নাও।</p>
+      <p class="small-note en">⚠️ This is a static site, so this password check only keeps out casual visitors — it is not secure authentication. The password lives in the code (ADMIN_PASSWORD variable); change it if you like.</p>
+    </div>
+
+    <div id="adminPanel" class="hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+        <div class="tabs">
+          <button class="tab-btn admin-sub-btn active" data-sub="questions" onclick="switchAdminSub('questions')"><span class="bn">প্রশ্ন ম্যানেজমেন্ট</span><span class="en">Questions</span></button>
+          <button class="tab-btn admin-sub-btn" data-sub="regs" onclick="switchAdminSub('regs')"><span class="bn">রেজিস্ট্রেশন তালিকা</span><span class="en">Registrations</span></button>
+        </div>
+        <button class="btn btn-ghost" onclick="adminLogout()"><span class="bn">লগআউট</span><span class="en">Log Out</span></button>
+      </div>
+
+      <!-- Question management -->
+      <div id="adminQuestions">
+        <div class="form-box" style="max-width:100%;">
+          <label><span class="bn">ক্যাটাগরি বেছে নাও</span><span class="en">Choose Category</span></label>
+          <select id="adminCatSelect" onchange="loadAdminQuestions()">
+            <option value="primary">প্রাইমারি (৩য়-৫ম)</option>
+            <option value="junior">জুনিয়র (৬ষ্ঠ-৮ম)</option>
+            <option value="senior">সিনিয়র (৯ম-১০ম)</option>
+          </select>
+          <p class="small-note bn" style="margin-top:14px;">নিচের বক্সে JSON ফরম্যাটে প্রশ্ন লেখো/পেস্ট করো, তারপর "সংরক্ষণ করো" চাপো। প্রতিটা প্রশ্নে ৪টা অপশন ও correct (সঠিক উত্তরের index, ০ থেকে শুরু) থাকতে হবে।</p>
+          <p class="small-note en" style="margin-top:2px;">Paste questions in JSON format below, then click Save. Each question needs 4 options and a "correct" index (0-based).</p>
+          <textarea id="adminQJson" style="width:100%;min-height:320px;font-family:var(--f-mono);font-size:0.82rem;padding:12px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);margin-top:10px;"></textarea>
+          <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="saveAdminQuestions()"><span class="bn">সংরক্ষণ করো</span><span class="en">Save Questions</span></button>
+            <button class="btn btn-ghost" onclick="loadAdminQuestions()"><span class="bn">রিলোড করো</span><span class="en">Reload</span></button>
+          </div>
+          <div id="adminQMsg"></div>
+        </div>
+      </div>
+
+      <!-- Registrations viewer -->
+      <div id="adminRegs" class="hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+          <p class="bn" style="margin:0;color:rgba(36,28,21,0.7);">সব রেজিস্ট্রেশনের তালিকা — এই তথ্য শুধু তুমিই দেখতে পাচ্ছ।</p>
+          <button class="btn btn-ghost" onclick="loadAdminRegistrations()"><span class="bn">রিফ্রেশ করো</span><span class="en">Refresh</span></button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="lb">
+            <thead><tr>
+              <th>ID</th><th><span class="bn">নাম</span><span class="en">Name</span></th>
+              <th><span class="bn">স্কুল</span><span class="en">School</span></th>
+              <th><span class="bn">ক্যাটাগরি</span><span class="en">Category</span></th>
+              <th><span class="bn">জেলা</span><span class="en">District</span></th>
+              <th><span class="bn">মোবাইল</span><span class="en">Phone</span></th>
+              <th><span class="bn">ইমেইল</span><span class="en">Email</span></th>
+              <th><span class="bn">পরীক্ষা</span><span class="en">Exam</span></th>
+              <th><span class="bn">স্কোর</span><span class="en">Score</span></th>
+            </tr></thead>
+            <tbody id="adminRegsBody"><tr><td colspan="9" style="text-align:center;padding:30px;">…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span class="bn">উত্তরবঙ্গ হেরিটেজ ফেস্ট © ২০২৬ — উত্তরবঙ্গের ইতিহাস সংরক্ষণে একটি প্রয়াস</span>
+    <span class="en">Uttarbanga Heritage Fest © 2026 — An effort to preserve North Bengal's history</span>
+  </div>
+</footer>
+
+<script src="./js/storage.js" defer></script>
+<script src="./js/common.js" defer></script>
+<script src="./js/admin.js" defer></script>
+</body>
+</html>

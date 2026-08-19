@@ -17,7 +17,7 @@ global.window = {
   }
 };
 
-require('../js/storage.js');
+require('../src/shared/storage.js');
 const storage = global.window.storage;
 
 let passed = 0;
