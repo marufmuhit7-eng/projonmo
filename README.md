@@ -95,12 +95,114 @@ Cheapest path from here, in order:
 
 ---
 
-## 1. Folder structure
+## Exam timer control (admin-managed)
+
+The countdown is no longer hardcoded. The organiser controls it from
+**Admin → টাইমার নিয়ন্ত্রণ**:
+
+| Control | Bengali label | Effect |
+| --- | --- | --- |
+| ON/OFF toggle | কাউন্টডাউন টাইমার দেখাও | Off hides the countdown box completely |
+| Date & time picker | পরীক্ষা শুরুর তারিখ ও সময় | The moment the exam opens (Bangladesh time) |
+| Off behaviour | টাইমার বন্ধ থাকলে কী হবে? | `live` = exam open now · `message` = show a notice |
+| Message (bn / en) | বার্তা | Shown when the timer is off and behaviour is `message` |
+| Status badge | টাইমার চালু / টাইমার বন্ধ | Current state at a glance |
+
+Behaviour on the exam page:
+
+| Setting | Countdown box | Exam form |
+| --- | --- | --- |
+| ON, date in the future | visible, ticking to the date | hidden |
+| ON, date passed | hidden | **open** |
+| OFF + `live` | hidden | **open**, regardless of the date |
+| OFF + `message` | hidden | hidden, organiser's message shown instead |
+
+The দিন / ঘণ্টা / মিনিট / সেকেন্ড boxes, their colours and their element ids are
+untouched — only what drives them changed.
+
+### localStorage or Supabase? — Supabase, and it is not close
+
+Your own reasoning was right, and the split into two deployments makes it
+decisive. localStorage is scoped to one **origin**, so a setting saved at
+`admin.yourdomain.com` is not merely "admin-only", it is *unreachable* from
+`yourdomain.com`. The public countdown would never change no matter what the
+organiser clicks. For a feature whose entire purpose is "one person changes it,
+everyone sees it", localStorage cannot work at all.
+
+Supabase over Firebase, for this project:
+
+- Row Level Security expresses exactly the rule you need — *everyone reads, one
+  signed-in organiser writes* — in two SQL policies, enforced by the server.
+- Supabase Auth replaces the fake `ADMIN_PASSWORD` constant with a real account,
+  so the admin gate stops being decorative.
+- Postgres means the registrations table can move to the same database later
+  with no second vendor.
+- It works from static HTML over a CDN script tag; no build step, no bundler.
+
+Firebase Realtime Database would also work; it is a reasonable second choice if
+your team already knows it. Vercel KV is ruled out — reaching it needs a server
+function, which this project deliberately does not have.
+
+**The code supports both today.** `src/shared/settings.js` has two backends and
+picks one at load time. With no configuration it uses localStorage and the admin
+panel prints a red warning saying the setting is not shared. Fill in
+`src/shared/config.js` and it switches to Supabase, with realtime push, and the
+warning turns green. Nothing else in the codebase changes.
+
+### Turning on Supabase
+
+1. Create a free project at <https://supabase.com>.
+2. SQL Editor → paste [`supabase/schema.sql`](supabase/schema.sql) → **Run**.
+   It creates the `settings` table, seeds row 1, enables RLS with the two
+   policies, and adds the table to the realtime publication.
+3. Authentication → Users → **Add user**: one organiser email + strong password.
+4. Authentication → Providers → **turn email signups off**. Skip this and the
+   public can register themselves an account that is allowed to write.
+5. Project Settings → API → copy the Project URL and the anon/publishable key
+   into `src/shared/config.js`.
+6. `npm run build && npm test`, then commit and push. Vercel redeploys both
+   projects.
+
+Verify RLS actually holds before the event — the second command **must** fail:
+
+```bash
+curl -s "$SUPABASE_URL/rest/v1/settings?select=*" -H "apikey: $ANON_KEY"
+
+curl -s -X PATCH "$SUPABASE_URL/rest/v1/settings?id=eq.1" \
+     -H "apikey: $ANON_KEY" -H "Content-Type: application/json" \
+     -d '{"timer_enabled": false}'
+```
+
+Putting the anon key in public JavaScript is correct and expected: it only lets
+a browser *ask*, and RLS decides the answer. Never put the `service_role` key
+there — that one bypasses RLS entirely.
+
+### Real-time updates
+
+On Supabase the exam page subscribes to `postgres_changes` on the `settings`
+table, so flipping the toggle updates visitors **already sitting on the page**,
+no reload. A 60-second poll (`POLL_INTERVAL_MS`) backs it up if the websocket
+drops. On the localStorage fallback, only other tabs of the same origin get the
+`storage` event.
+
+### Untested
+
+The Supabase code path could not be exercised here — there is no live project to
+point it at. Verified instead: API shapes against the current supabase-js v2
+docs, and every branch of the settings layer, the date/timezone conversion and
+all three exam-gate states against the localStorage backend (81 assertions).
+Run step 6's `curl` checks after configuring, before the event.
+
+---
+
+## Folder structure
 
 ```
 .
 ├── src/                                  ← EDIT HERE. Not deployed.
 │   ├── shared/
+│   │   ├── config.js                     ← Supabase URL + anon key go HERE
+│   │   ├── settings.js                   exam-timer settings, swappable backend
 │   │   ├── styles.css
 │   │   ├── storage.js                    storage adapter (see below)
 │   │   ├── common.js                     QUESTIONS, CATEGORY_LABELS, getCategoryKey, lang toggle
@@ -116,7 +218,7 @@ Cheapest path from here, in order:
 ├── public-site/                          ← GENERATED. Vercel project A, Root Directory = public-site
 │   ├── index.html
 │   ├── css/styles.css
-│   ├── js/{storage.js, common.js, app.js}
+│   ├── js/{config.js, settings.js, storage.js, common.js, app.js}
 │   ├── images/heritage-fest-logo-708214d0.jpg
 │   ├── robots.txt                        Allow: /
 │   ├── vercel.json
@@ -125,17 +227,20 @@ Cheapest path from here, in order:
 ├── admin-panel/                          ← GENERATED. Vercel project B, Root Directory = admin-panel
 │   ├── index.html
 │   ├── css/styles.css
-│   ├── js/{storage.js, common.js, admin.js}
+│   ├── js/{config.js, settings.js, storage.js, common.js, admin.js}
 │   ├── images/heritage-fest-logo-708214d0.jpg
 │   ├── robots.txt                        Disallow: /
 │   ├── vercel.json                       + X-Robots-Tag, no-store, DENY framing
 │   └── package.json
 │
+├── supabase/
+│   └── schema.sql                        table + RLS policies + realtime
 ├── tools/
 │   ├── build.py                          src/ → public-site/ + admin-panel/
 │   ├── carve.py                          one-time migration, kept for provenance
 │   ├── storage.test.js                   storage contract (9 assertions)
-│   └── apps.test.js                      both apps + the origin-isolation proof (27 assertions)
+│   ├── settings.test.js                  timer settings + date/TZ edges (27 assertions)
+│   └── apps.test.js                      both apps, origin-isolation proof, timer UI (54 assertions)
 └── package.json
 ```
 
@@ -269,7 +374,7 @@ Checklist:
 ```bash
 npm run build     # regenerate both folders from src/
 npm run dev       # public on :8000, admin on :8001
-npm test          # 9 + 27 assertions (needs both dev servers + jsdom)
+npm test          # 9 + 27 + 54 assertions (needs both dev servers + jsdom)
 ```
 
 ```bash

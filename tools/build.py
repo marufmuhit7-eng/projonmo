@@ -15,6 +15,7 @@ Run:  python3 tools/build.py     (or: npm run build)
 from __future__ import annotations
 
 import pathlib
+import re
 import shutil
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -31,6 +32,17 @@ FONTS = (
 )
 
 LOGO = "heritage-fest-logo-708214d0.jpg"
+
+# supabase-js is only pulled in when a backend is actually configured, so an
+# unconfigured build makes zero third-party requests.
+SUPABASE_CDN = '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>'
+
+
+def supabase_configured() -> bool:
+    """True when src/shared/config.js has a non-empty SUPABASE_URL."""
+    cfg = (SRC / "shared" / "config.js").read_text(encoding="utf-8")
+    m = re.search(r"SUPABASE_URL:\s*'([^']*)'", cfg)
+    return bool(m and m.group(1).strip())
 
 PUBLIC_HEAD = f"""<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -70,8 +82,11 @@ ADMIN_NAV = f"""<nav class="topnav">
 </nav>"""
 
 
-def page(head: str, body: str, scripts: list[str]) -> str:
+def page(head: str, body: str, scripts: list[str], vendor: str = "") -> str:
     tags = "\n".join(f'<script src="./js/{s}" defer></script>' for s in scripts)
+    if vendor:
+        # Must execute BEFORE settings.js, which looks for window.supabase.
+        tags = vendor + "\n" + tags
     return f"""<!DOCTYPE html>
 <html lang="bn">
 <head>
@@ -93,6 +108,8 @@ def copy_shared(dest: pathlib.Path, app_script: str, app_src: pathlib.Path) -> N
     (dest / "images").mkdir(parents=True, exist_ok=True)
 
     shutil.copy2(SRC / "shared" / "styles.css", dest / "css" / "styles.css")
+    shutil.copy2(SRC / "shared" / "config.js", dest / "js" / "config.js")
+    shutil.copy2(SRC / "shared" / "settings.js", dest / "js" / "settings.js")
     shutil.copy2(SRC / "shared" / "storage.js", dest / "js" / "storage.js")
     shutil.copy2(SRC / "shared" / "common.js", dest / "js" / "common.js")
     shutil.copy2(app_src, dest / "js" / app_script)
@@ -109,7 +126,10 @@ def main() -> None:
 
     body = (SRC / "public" / "body.html").read_text(encoding="utf-8").strip()
     (pub / "index.html").write_text(
-        page(PUBLIC_HEAD, body, ["storage.js", "common.js", "app.js"]), encoding="utf-8"
+        page(PUBLIC_HEAD, body,
+             ["config.js", "settings.js", "storage.js", "common.js", "app.js"],
+             vendor=SUPABASE_CDN if supabase_configured() else ""),
+        encoding="utf-8",
     )
     (pub / "robots.txt").write_text("User-agent: *\nAllow: /\n", encoding="utf-8")
 
@@ -124,7 +144,9 @@ def main() -> None:
     section = section.replace('<section id="admin">', '<section id="admin" class="active">', 1)
     footer = (SRC / "shared" / "footer.html").read_text(encoding="utf-8").strip()
     (adm / "index.html").write_text(
-        page(ADMIN_HEAD, f"{ADMIN_NAV}\n\n{section}\n\n{footer}", ["storage.js", "common.js", "admin.js"]),
+        page(ADMIN_HEAD, f"{ADMIN_NAV}\n\n{section}\n\n{footer}",
+             ["config.js", "settings.js", "storage.js", "common.js", "admin.js"],
+             vendor=SUPABASE_CDN if supabase_configured() else ""),
         encoding="utf-8",
     )
     (adm / "robots.txt").write_text(

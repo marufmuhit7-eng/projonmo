@@ -113,6 +113,80 @@ const text = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
   console.log('         scheme+host+port, so two deployments can never share it.');
   console.log('         A shared backend is required. See README, "Architecture".');
 
+  // =====================================================================
+  console.log('\nD. EXAM TIMER CONTROL\n');
+
+  // ---- admin UI ------------------------------------------------------
+  check('admin has a "টাইমার নিয়ন্ত্রণ" sub-tab', !!adoc.querySelector('[data-sub="timer"]'));
+  check('admin timer panel exists and starts hidden',
+    adoc.getElementById('adminTimer')?.classList.contains('hidden'));
+  check('ON/OFF toggle present', adoc.getElementById('timerEnabledInput')?.type === 'checkbox');
+  check('date & time picker present', adoc.getElementById('timerDateInput')?.type === 'datetime-local');
+  check('off-behaviour select offers both live and message',
+    [...(adoc.getElementById('timerOffBehaviorInput')?.options || [])].map((o) => o.value).join(',') === 'live,message');
+  check('custom message fields present (bn + en)',
+    !!adoc.getElementById('timerMessageBnInput') && !!adoc.getElementById('timerMessageEnInput'));
+  check('Save button present', !!adoc.getElementById('timerSaveBtn'));
+  check('status badge present', !!adoc.getElementById('timerStatusBadge'));
+  check('Bengali labels used in the admin timer UI',
+    /কাউন্টডাউন টাইমার দেখাও/.test(adoc.body.textContent) &&
+    /পরীক্ষা শুরুর তারিখ ও সময়/.test(adoc.body.textContent));
+  check('admin timer handlers are wired',
+    typeof adm.window.loadTimerSettings === 'function' && typeof adm.window.saveTimerSettings === 'function');
+  check('admin warns on screen that localStorage is not shared',
+    (() => { adm.window.renderTimerBackendNote();
+      return /localStorage/.test(adoc.getElementById('timerBackendNote').textContent); })());
+
+  // ---- public exam gate: three states --------------------------------
+  const pw = pub.window;
+  const gate = (s) => pw.renderExamGate(pw.examSettings.normalise(s));
+  const vis = (id) => !pdoc.getElementById(id).classList.contains('hidden');
+
+  const FUTURE = '2099-01-01T00:00:00+06:00';
+  const PAST = '2000-01-01T00:00:00+06:00';
+
+  gate({ timerEnabled: true, examStartDate: FUTURE });
+  check('timer ON, date in the future -> countdown box is VISIBLE', vis('countdownBox'));
+  check('timer ON, future -> locked panel shown, login hidden', vis('examLocked') && !vis('examLogin'));
+  check('timer ON, future -> countdown digits are actually counting',
+    /^\d{2}$/.test(pdoc.getElementById('cdDays').textContent) &&
+    pdoc.getElementById('cdDays').textContent !== '00');
+  check('timer ON -> Bangla date is rendered in the locked message',
+    /[০-৯]/.test(pdoc.getElementById('examLockedTextBn').textContent));
+
+  gate({ timerEnabled: true, examStartDate: PAST });
+  check('timer ON, date passed -> exam login shown, countdown hidden',
+    vis('examLogin') && !vis('examLocked'));
+
+  gate({ timerEnabled: false, offBehavior: 'live', examStartDate: FUTURE });
+  check('timer OFF + live -> countdown box HIDDEN', !vis('countdownBox'));
+  check('timer OFF + live -> exam is open even though the date is in the future',
+    vis('examLogin') && !vis('examLocked'));
+
+  gate({ timerEnabled: false, offBehavior: 'message', examStartDate: FUTURE,
+    customMessage: 'পরীক্ষা সাময়িকভাবে বন্ধ আছে।', customMessageEn: 'The exam is paused.' });
+  check('timer OFF + message -> countdown box HIDDEN', !vis('countdownBox'));
+  check('timer OFF + message -> the organiser message is displayed',
+    pdoc.getElementById('examLockedTextBn').textContent === 'পরীক্ষা সাময়িকভাবে বন্ধ আছে।');
+  check('timer OFF + message -> exam login stays hidden', !vis('examLogin'));
+
+  // ---- the Bengali design must be untouched ---------------------------
+  const cdText = pdoc.getElementById('countdownBox').textContent;
+  check('countdown still labelled দিন / ঘণ্টা / মিনিট / সেকেন্ড',
+    ['দিন', 'ঘণ্টা', 'মিনিট', 'সেকেন্ড'].every((w) => cdText.includes(w)), cdText.replace(/\s+/g, ' ').trim());
+  check('all four countdown cells still exist with their original ids',
+    ['cdDays', 'cdHours', 'cdMinutes', 'cdSeconds'].every((id) => !!pdoc.getElementById(id)));
+  check('the old hardcoded EXAM_START_DATE constant is gone',
+    !text('public-site/js/app.js').includes('const EXAM_START_DATE'));
+
+  // ---- existing behaviour not broken ----------------------------------
+  check('registration, exam and leaderboard functions all still defined',
+    ['startExam', 'submitExam', 'loadLeaderboard', 'selectAnswer'].every((f) => typeof pw[f] === 'function'));
+  check('settings layer reports the local backend when Supabase is unconfigured',
+    pw.examSettings.backend === 'local');
+  check('no supabase CDN request is made while unconfigured',
+    !text('public-site/index.html').includes('supabase-js'));
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
 })().catch((err) => {

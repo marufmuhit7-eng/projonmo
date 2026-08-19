@@ -54,36 +54,102 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
 
 /* ---------- Exam ---------- */
 
-const EXAM_START_DATE = new Date("2026-09-25T00:00:00+06:00");
+/*
+ * The exam gate is driven entirely by window.examSettings, which the organiser
+ * controls from the admin panel:
+ *
+ *   timerEnabled = true   -> countdown runs to examStartDate, then the exam opens
+ *   timerEnabled = false  -> countdown box is hidden completely, and then
+ *                            offBehavior 'live'    -> the exam is open right now
+ *                            offBehavior 'message' -> show the organiser's message
+ *
+ * examStartDate is dynamic; the old hardcoded 25 Sep 2026 constant is gone and
+ * now only survives as the default inside settings.js.
+ */
 
 let countdownInterval = null;
+let examSettings = null;          // last settings we rendered
+let unsubscribeExamSettings = null;
+
+/** The moment the exam opens, as a Date. Falls back to the built-in default. */
+function examStartAt(){
+  return new Date((examSettings || window.examSettings.current()).examStartDate);
+}
+
+function stopCountdown(){
+  if(countdownInterval){ clearInterval(countdownInterval); countdownInterval = null; }
+}
 
 async function checkExamAvailability(){
-  const now = new Date();
-  const lockedBox = document.getElementById('examLocked');
-  const loginBox = document.getElementById('examLogin');
-  if(now < EXAM_START_DATE){
+  try{
+    examSettings = await window.examSettings.load();
+  }catch(err){
+    // Never leave the student staring at a blank page because a fetch failed —
+    // fall back to whatever we last knew, or the defaults.
+    console.error('exam settings unavailable, using last known values', err);
+    examSettings = window.examSettings.current();
+  }
+  renderExamGate(examSettings);
+}
+
+/** Pure render step: given settings, put the exam section in the right state. */
+function renderExamGate(s){
+  const lockedBox   = document.getElementById('examLocked');
+  const loginBox    = document.getElementById('examLogin');
+  const countdownEl = document.getElementById('countdownBox');
+  const lockedBn    = document.getElementById('examLockedTextBn');
+  const lockedEn    = document.getElementById('examLockedTextEn');
+  const heading     = lockedBox.querySelectorAll('h3');
+
+  stopCountdown();
+
+  // ---- timer switched OFF by the organiser --------------------------------
+  if(!s.timerEnabled){
+    countdownEl.classList.add('hidden');
+
+    if(s.offBehavior === 'live'){
+      lockedBox.classList.add('hidden');
+      loginBox.classList.remove('hidden');
+      return;
+    }
+
+    // custom message
     lockedBox.classList.remove('hidden');
     loginBox.classList.add('hidden');
-    document.getElementById('examLockedTextBn').textContent =
-      '২৫ সেপ্টেম্বর, ২০২৬ তারিখ থেকে পরীক্ষা শুরু হবে। এই তারিখের আগে পরীক্ষায় অংশ নেওয়া যাবে না। নিচে কতক্ষণ বাকি তা দেখা যাচ্ছে:';
-    document.getElementById('examLockedTextEn').textContent =
-      'The exam opens on September 25, 2026. You cannot take the exam before this date. Time remaining is shown below:';
-    if(countdownInterval) clearInterval(countdownInterval);
+    if(heading[0]) heading[0].textContent = '📢 ঘোষণা';
+    if(heading[1]) heading[1].textContent = '📢 Notice';
+    lockedBn.textContent = s.customMessage || 'পরীক্ষা আপাতত বন্ধ আছে।';
+    lockedEn.textContent = s.customMessageEn || s.customMessage || 'The exam is closed for now.';
+    return;
+  }
+
+  // ---- timer ON -----------------------------------------------------------
+  countdownEl.classList.remove('hidden');
+  if(heading[0]) heading[0].textContent = '⏳ পরীক্ষা এখনো শুরু হয়নি';
+  if(heading[1]) heading[1].textContent = "⏳ The exam hasn't started yet";
+
+  const startAt = new Date(s.examStartDate);
+  if(new Date() < startAt){
+    lockedBox.classList.remove('hidden');
+    loginBox.classList.add('hidden');
+    lockedBn.textContent =
+      window.examSettings.formatBnDateTime(s.examStartDate) +
+      ' তারিখ থেকে পরীক্ষা শুরু হবে। এই সময়ের আগে পরীক্ষায় অংশ নেওয়া যাবে না। নিচে কতক্ষণ বাকি তা দেখা যাচ্ছে:';
+    lockedEn.textContent =
+      'The exam opens on ' + startAt.toLocaleString('en-GB', { dateStyle: 'long', timeStyle: 'short' }) +
+      '. You cannot take the exam before this time. Time remaining is shown below:';
     tickCountdown();
     countdownInterval = setInterval(tickCountdown, 1000);
   }else{
-    if(countdownInterval){ clearInterval(countdownInterval); countdownInterval = null; }
     lockedBox.classList.add('hidden');
     loginBox.classList.remove('hidden');
   }
 }
 
 function tickCountdown(){
-  const diffMs = EXAM_START_DATE - new Date();
+  const diffMs = examStartAt() - new Date();
   if(diffMs <= 0){
-    clearInterval(countdownInterval);
-    countdownInterval = null;
+    stopCountdown();
     checkExamAvailability();
     return;
   }
@@ -97,6 +163,20 @@ function tickCountdown(){
   document.getElementById('cdMinutes').textContent = String(minutes).padStart(2,'0');
   document.getElementById('cdSeconds').textContent = String(seconds).padStart(2,'0');
 }
+
+/*
+ * Push updates: on Supabase this is a realtime subscription, so an organiser
+ * flipping the switch reaches everyone already sitting on the page. On the
+ * localStorage fallback it is a same-origin storage event plus slow polling.
+ */
+unsubscribeExamSettings = window.examSettings.subscribe(function(s){
+  examSettings = s;
+  renderExamGate(s);
+});
+window.addEventListener('pagehide', function(){
+  if(unsubscribeExamSettings) unsubscribeExamSettings();
+  stopCountdown();
+});
 
 async function loadQuestionsForCategory(catKey){
   try{
@@ -120,7 +200,13 @@ let examStartTime = null;
 async function startExam(){
   const msgBox = document.getElementById('examLoginMsg');
   msgBox.innerHTML = '';
-  if(new Date() < EXAM_START_DATE){
+  // Re-check the live setting: the organiser may have opened or closed the exam
+  // since this page was loaded.
+  const gate = examSettings || window.examSettings.current();
+  const stillLocked = gate.timerEnabled
+    ? new Date() < new Date(gate.examStartDate)
+    : gate.offBehavior === 'message';
+  if(stillLocked){
     checkExamAvailability();
     return;
   }
