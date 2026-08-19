@@ -1,0 +1,26 @@
+{
+  "name": "projonmo-uttorbongo-heritage-fest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Uttarbanga Heritage Fest — static bilingual (Bangla/English) event site with registration, quiz, leaderboard and organizer panel. Presented by Projonmo Foundation.",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marufmuhit7-eng/projonmo.git"
+  },
+  "scripts": {
+    "build": "echo \"Static site — no build step required.\"",
+    "dev": "python3 -m http.server 8000 --bind 0.0.0.0",
+    "test": "node tools/storage.test.js && node tools/page.test.js",
+    "test:storage": "node tools/storage.test.js",
+    "test:page": "node tools/page.test.js",
+    "split": "python3 tools/split.py"
+  },
+  "keywords": [
+    "static-site",
+    "vercel",
+    "bangla",
+    "heritage-fest",
+    "quiz"
+  ]
+}
