@@ -8,9 +8,10 @@ One static Vercel deployment. The public site is at `/`, the organiser panel at
 | Public website | `/` | yes |
 | Admin panel | `/admin` | **no** — `noindex` header + `Disallow: /admin` |
 
-The admin panel is not linked from anywhere on the public site, but it lives on
-the same domain now. Read the security note below before treating that as
-private.
+The admin panel is reachable from a small `অ্যাডমিন লগইন` link in the footer of
+every public page (`rel="nofollow"`, and the page itself is `noindex`). It is
+not in the top navigation. Read the security note below before treating any of
+that as private.
 
 ---
 
@@ -261,7 +262,7 @@ Run step 6's `curl` checks after configuring, before the event.
 │   ├── storage.test.js                   9 assertions
 │   ├── settings.test.js                  32 assertions
 │   ├── auth.test.js                      36 assertions
-│   └── apps.test.js                      88 assertions
+│   └── apps.test.js                      97 assertions
 └── package.json
 ```
 
@@ -391,7 +392,9 @@ Checklist:
 
 - [ ] Admin password changed from the default `admin` / `admin123` (the panel
       shows a red banner until you do)
-- [ ] `/admin` kept out of sitemaps, social posts and the public nav
+- [ ] `/admin` kept out of sitemaps and social posts. It is linked from the
+      footer by request; the link is `rel="nofollow"` and the page is `noindex`,
+      but a footer link means anyone can find it
 - [ ] `x-robots-tag: noindex` confirmed with `curl -sI`
 - [ ] Understood that the login runs client-side and can be bypassed from DevTools
 - [ ] Real fix scheduled: Supabase Auth + server-side checks
@@ -401,7 +404,7 @@ Checklist:
 ```bash
 npm run build     # regenerate index.html, admin.html and assets from src/
 npm run dev       # site on :8000, /admin included (mirrors vercel.json)
-npm test          # 9 + 32 + 36 + 88 assertions (needs the dev server + jsdom)
+npm test          # 9 + 32 + 36 + 97 assertions (needs the dev server + jsdom)
 ```
 
 ```bash

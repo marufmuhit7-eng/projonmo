@@ -154,3 +154,13 @@
   .switch input:checked + .switch-track{background:var(--clay);}
   .switch input:checked + .switch-track .switch-thumb{transform:translateX(24px);}
   .switch input:focus-visible + .switch-track{outline:2px solid var(--brass);outline-offset:2px;}
+
+  /* ---- Discreet admin link in the footer ---- */
+  .footer-links{margin-top:10px;font-size:0.76rem;}
+  .footer-links a{
+    color:rgba(241,233,216,0.38);text-decoration:none;
+    border-bottom:1px solid transparent;padding-bottom:1px;transition:color .15s,border-color .15s;
+  }
+  .footer-links a:hover,.footer-links a:focus-visible{
+    color:rgba(241,233,216,0.85);border-bottom-color:var(--brass);
+  }

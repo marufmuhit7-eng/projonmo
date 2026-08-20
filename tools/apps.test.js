@@ -103,8 +103,21 @@ function load(urlPath) {
     .every((id) => sections.includes(id)), sections.join(','));
   check('has NO admin section embedded in the page', !sections.includes('admin'));
   check('has NO admin nav tab', !pdoc.querySelector('[data-tab="admin"]'));
-  check('no link in the public page points at /admin',
-    [...pdoc.querySelectorAll('a[href]')].every((a) => !/admin/i.test(a.getAttribute('href'))));
+  const adminLinks = [...pdoc.querySelectorAll('a[href]')].filter((a) => /admin/i.test(a.getAttribute('href')));
+  check('exactly ONE admin link on the public page', adminLinks.length === 1,
+    adminLinks.map((a) => a.getAttribute('href')).join(','));
+  check('that link lives in the footer, not the top navigation',
+    !!adminLinks[0]?.closest('footer') && !pdoc.querySelector('nav a[href*="admin"]'));
+  check('top nav still has no admin tab button', !pdoc.querySelector('[data-tab="admin"]'));
+  check('the footer link is labelled অ্যাডমিন লগইন / Admin Login',
+    /অ্যাডমিন লগইন/.test(adminLinks[0].textContent) && /Admin Login/.test(adminLinks[0].textContent));
+  check('the footer link points at the clean /admin URL (no redirect hop)',
+    adminLinks[0].getAttribute('href') === '/admin');
+  check('the footer link is rel=nofollow, matching the noindex header',
+    /nofollow/.test(adminLinks[0].getAttribute('rel') || ''));
+  check('it is styled discreetly via .footer-links, not as a nav item',
+    !!adminLinks[0].closest('.footer-links') &&
+    text('css/styles.css').includes('.footer-links a'));
   check('meta robots = index, follow', pdoc.querySelector('meta[name="robots"]')?.content === 'index, follow');
   check('public app booted', typeof pw.switchTab === 'function' && !!pdoc.getElementById('regForm'));
   check('zero uncaught JS errors', pubErrors.length === 0, pubErrors.join(' || '));
@@ -125,7 +138,9 @@ function load(urlPath) {
   check('admin app booted', typeof adm.window.adminLogin === 'function' &&
     typeof adm.window.loadTimerSettings === 'function');
   check('shares common.js with the public page', typeof adm.window.getCategoryKey === 'function');
-  check('no link back to the public site from the admin nav', adoc.querySelectorAll('nav a').length === 0);
+  check('no link back to the public site from the admin NAV', adoc.querySelectorAll('nav a').length === 0);
+  check('admin footer links back to the site rather than to itself',
+    adoc.querySelector('footer .footer-links a')?.getAttribute('href') === '/');
   check('zero uncaught JS errors', admErrors.length === 0, admErrors.join(' || '));
 
   // =====================================================================
@@ -324,6 +339,10 @@ function load(urlPath) {
     ['src', 'tools', 'supabase'].every((d) => text('.vercelignore').includes(d)));
   check('the old split folders are gone',
     !fs.existsSync(path.join(ROOT, 'public-site')) && !fs.existsSync(path.join(ROOT, 'admin-panel')));
+  check('the 404 page carries the same discreet admin link',
+    /footer-links/.test(text('404.html')) && /href="\/admin"/.test(text('404.html')));
+  check('the stale "ADMIN" section comment is gone from the public page',
+    !text('index.html').includes('======== ADMIN'));
   check('index.html, admin.html and 404.html all exist at the root',
     ['index.html', 'admin.html', '404.html'].every((f) => fs.existsSync(path.join(ROOT, f))));
 
