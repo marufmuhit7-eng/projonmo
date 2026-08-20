@@ -28,8 +28,19 @@
   var SESSION_KEY = 'uhf:admin:session';
 
   // Seeded on first run. Change them from the panel; these are only the bootstrap.
-  var DEFAULT_USERNAME = 'admin';
-  var DEFAULT_PASSWORD = 'admin123';
+  var DEFAULT_USERNAME = 'muhit123';
+  var DEFAULT_PASSWORD = 'ami muhit 321';
+
+  /*
+   * Bump this whenever DEFAULT_USERNAME / DEFAULT_PASSWORD change.
+   *
+   * Credentials are seeded into localStorage on first load, so without this a
+   * browser that already ran an older build would keep the old defaults forever
+   * and the new ones would appear not to work. On a version bump we re-seed —
+   * but ONLY if the organiser never set a password of their own. A password
+   * they chose is never overwritten.
+   */
+  var SEED_VERSION = 2;
 
   var MIN_PASSWORD_LENGTH = 6;
 
@@ -107,10 +118,19 @@
     window.localStorage.setItem(CRED_KEY, JSON.stringify(cred));
   }
 
-  /** Create the default admin/admin123 credential the first time the panel loads. */
+  /**
+   * Create the default credential the first time the panel loads, and refresh
+   * it if the shipped defaults changed while the organiser was still on them.
+   */
   function ensureSeeded() {
     var existing = readCredential();
-    if (existing) return Promise.resolve(existing);
+
+    // A password the organiser chose themselves is never touched.
+    if (existing && !existing.isDefault) return Promise.resolve(existing);
+
+    // Still on the shipped defaults and already at the current version: nothing to do.
+    if (existing && existing.seedVersion === SEED_VERSION) return Promise.resolve(existing);
+
     var salt = randomSalt();
     return hashPassword(salt, DEFAULT_PASSWORD).then(function (h) {
       var cred = {
@@ -119,9 +139,15 @@
         hash: h.hash,
         algo: h.algo,
         isDefault: true,
+        seedVersion: SEED_VERSION,
         updatedAt: new Date().toISOString()
       };
       writeCredential(cred);
+      if (existing) {
+        // The old default is gone; whoever was signed in with it must sign in again.
+        window.sessionStorage.removeItem(SESSION_KEY);
+        console.info('[auth] default credentials updated to seed v' + SEED_VERSION + '; please sign in again.');
+      }
       return cred;
     });
   }
@@ -219,6 +245,7 @@
               hash: nh.hash,
               algo: nh.algo,
               isDefault: false,
+              seedVersion: SEED_VERSION,
               updatedAt: new Date().toISOString()
             });
             return { ok: true };
@@ -227,7 +254,7 @@
       });
     },
 
-    /** Escape hatch for a forgotten password: wipes back to admin / admin123. */
+    /** Escape hatch for a forgotten password: wipes back to the shipped defaults. */
     resetToDefaults: function () {
       window.localStorage.removeItem(CRED_KEY);
       window.sessionStorage.removeItem(SESSION_KEY);

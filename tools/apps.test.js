@@ -122,6 +122,51 @@ function load(urlPath) {
   check('public app booted', typeof pw.switchTab === 'function' && !!pdoc.getElementById('regForm'));
   check('zero uncaught JS errors', pubErrors.length === 0, pubErrors.join(' || '));
 
+  // ---- team & sponsors -------------------------------------------------
+  const team = pdoc.getElementById('team');
+  const heads = [...team.querySelectorAll('.credit-head h3 .bn')].map((e) => e.textContent);
+  check('four credit sections in the required order',
+    heads.join(' | ') === 'প্রধান সমন্বয়কারী ও টাইটেল স্পন্সর | সহ-আয়োজক | আয়োজক দল | আমাদের পৃষ্ঠপোষকবৃন্দ',
+    heads.join(' | '));
+  check('title sponsor card: Projonmo Foundation with the premium frame',
+    !!team.querySelector('.tier-title img[src$="projonmo-logo.jpg"]') &&
+    /প্রজন্ম ফাউন্ডেশন/.test(team.querySelector('.tier-title').textContent) &&
+    /টাইটেল স্পন্সর/.test(team.querySelector('.tier-title').textContent));
+  check('co-organizer card: The Normative, smaller tier',
+    !!team.querySelector('.tier-co img[src$="normative-logo.jpg"]') &&
+    /The Normative/.test(team.querySelector('.tier-co').textContent));
+  check('committee: exactly two people, in order, with roles',
+    [...team.querySelectorAll('.person')].length === 2 &&
+    /মুদাব্বির মারুফ মুহিত/.test(team.querySelectorAll('.person')[0].textContent) &&
+    /আহ্বায়ক/.test(team.querySelectorAll('.person')[0].textContent) &&
+    /শেখ ইমরোজ ওয়াতান/.test(team.querySelectorAll('.person')[1].textContent) &&
+    /যুগ্ম আহ্বায়ক/.test(team.querySelectorAll('.person')[1].textContent));
+  check('committee photos are the right files, not swapped',
+    team.querySelectorAll('.person img')[0].getAttribute('src').endsWith('muhit.jpg') &&
+    team.querySelectorAll('.person img')[1].getAttribute('src').endsWith('watan.jpg'));
+  check('three sponsors in the exact requested order',
+    [...team.querySelectorAll('.sponsor img')].map((i) => i.getAttribute('src').split('/').pop()).join(',')
+      === 'rcc.jpg,dnc.jpg,royalty.jpg');
+  check('sponsor names present in Bangla',
+    /রংপুর সিটি কর্পোরেশন/.test(team.textContent) &&
+    /মাদকদ্রব্য নিয়ন্ত্রণ অধিদপ্তর/.test(team.textContent) &&
+    /রয়্যালটি মেগা মল/.test(team.textContent));
+  check('every team image file exists on disk',
+    ['projonmo-logo','normative-logo','muhit','watan','rcc','dnc','royalty']
+      .every((n) => fs.existsSync(path.join(ROOT, 'images', n + '.jpg'))));
+  check('every image has alt text and explicit width/height (no layout shift)',
+    [...team.querySelectorAll('img')].every((i) =>
+      i.getAttribute('alt') && i.getAttribute('width') && i.getAttribute('height')));
+  check('images are lazy-loaded', [...team.querySelectorAll('img')].every((i) => i.getAttribute('loading') === 'lazy'));
+  check('the old placeholder committee is gone',
+    !/সদস্যের নাম/.test(team.textContent) && !/নমুনা/.test(team.textContent));
+  check('responsive rules present: 1 column people, 2 column sponsors on mobile',
+    text('css/styles.css').includes('.people-grid{grid-template-columns:1fr;}') &&
+    text('css/styles.css').includes('.sponsor-grid{grid-template-columns:repeat(2,1fr);}'));
+  check('hover lift defined on all four card types',
+    ['.tier-title:hover','.tier-co:hover','.person:hover','.sponsor:hover']
+      .every((sel) => text('css/styles.css').includes(sel)));
+
   // =====================================================================
   console.log('\nD. ADMIN PANEL  (/admin)\n');
   const { dom: adm, errors: admErrors } = await load('/admin');
@@ -164,28 +209,37 @@ function load(urlPath) {
     /পাসওয়ার্ড পরিবর্তন করুন/.test(el('adminPassword').textContent));
 
   // wrong credentials
-  el('adminUserInput').value = 'admin';
+  el('adminUserInput').value = 'muhit123';
   el('adminPassInput').value = 'wrongpass';
   await aw.adminLogin();
   await new Promise((r) => setTimeout(r, 150));
-  check('wrong password shows an error and keeps the dashboard hidden',
-    /ভুল/.test(el('adminLoginMsg').textContent) && !shown('adminPanel'));
+  check('wrong password shows the exact message "ইউজারনেম বা পাসওয়ার্ড ভুল হয়েছে!"',
+    el('adminLoginMsg').textContent.includes('ইউজারনেম বা পাসওয়ার্ড ভুল হয়েছে!') && !shown('adminPanel'),
+    el('adminLoginMsg').textContent);
+
+  el('adminUserInput').value = 'wronguser';
+  el('adminPassInput').value = 'ami muhit 321';
+  await aw.adminLogin();
+  await new Promise((r) => setTimeout(r, 150));
+  check('wrong USERNAME shows the identical message (no user enumeration)',
+    el('adminLoginMsg').textContent.includes('ইউজারনেম বা পাসওয়ার্ড ভুল হয়েছে!'));
   check('the password field is cleared after a failed attempt', el('adminPassInput').value === '');
 
   // correct credentials
-  el('adminUserInput').value = 'admin';
-  el('adminPassInput').value = 'admin123';
+  el('adminUserInput').value = 'muhit123';
+  el('adminPassInput').value = 'ami muhit 321';
   await aw.adminLogin();
   await new Promise((r) => setTimeout(r, 200));
-  check('admin / admin123 unlocks the dashboard', shown('adminPanel') && !shown('adminLogin'));
+  check('muhit123 / "ami muhit 321" unlocks the dashboard', shown('adminPanel') && !shown('adminLogin'));
+  check('a password with spaces is accepted verbatim, not trimmed', shown('adminPanel'));
   check('session stored in sessionStorage', !!aw.sessionStorage.getItem('uhf:admin:session'));
-  check('header shows who is signed in', /admin/.test(el('adminWhoami').textContent));
+  check('header shows who is signed in', /muhit123/.test(el('adminWhoami').textContent));
   check('default-password warning is visible until it is changed', shown('adminDefaultPassWarning'));
   check('admin controls are reachable only now',
     !!el('timerEnabledInput') && !!el('adminQJson'));
 
   // change password
-  el('curPassInput').value = 'admin123';
+  el('curPassInput').value = 'ami muhit 321';
   el('newPassInput').value = 'uhf';
   el('confirmPassInput').value = 'uhf';
   await aw.changeAdminPassword();
@@ -193,14 +247,14 @@ function load(urlPath) {
   check('too-short password rejected with a Bengali message',
     /৬ অক্ষর/.test(el('adminPassMsg').textContent));
 
-  el('curPassInput').value = 'admin123';
+  el('curPassInput').value = 'ami muhit 321';
   el('newPassInput').value = 'heritage2026';
   el('confirmPassInput').value = 'different';
   await aw.changeAdminPassword();
   await new Promise((r) => setTimeout(r, 150));
   check('mismatched confirmation rejected', /মিলছে না/.test(el('adminPassMsg').textContent));
 
-  el('curPassInput').value = 'admin123';
+  el('curPassInput').value = 'ami muhit 321';
   el('newPassInput').value = 'heritage2026';
   el('confirmPassInput').value = 'heritage2026';
   await aw.changeAdminPassword();
@@ -221,7 +275,7 @@ function load(urlPath) {
   check('logout confirmation message shown', /লগআউট হয়ে গেছে/.test(el('adminLoginMsg').textContent));
 
   // log back in with the NEW password for the remaining sections
-  el('adminUserInput').value = 'admin';
+  el('adminUserInput').value = 'muhit123';
   el('adminPassInput').value = 'heritage2026';
   await aw.adminLogin();
   await new Promise((r) => setTimeout(r, 200));
@@ -231,6 +285,11 @@ function load(urlPath) {
     !fs.existsSync(path.join(ROOT, 'index.html')) || !text('index.html').includes('auth.js'));
   check('the old hardcoded ADMIN_PASSWORD constant is gone',
     !text('js/admin.js').includes('const ADMIN_PASSWORD'));
+  check('the shipped defaults are muhit123 / "ami muhit 321"',
+    text('js/auth.js').includes("var DEFAULT_USERNAME = 'muhit123'") &&
+    text('js/auth.js').includes("var DEFAULT_PASSWORD = 'ami muhit 321'"));
+  check('no trace of the previous admin/admin123 defaults remains',
+    !text('js/auth.js').includes('admin123') && !text('admin.html').includes('admin123'));
 
   // =====================================================================
   console.log('\nE. EXAM TIMER CONTROL\n');

@@ -31,10 +31,14 @@ function showAdminLogin(){
   document.getElementById('adminLogin').classList.remove('hidden');
 }
 
-const LOGIN_ERRORS = {
-  'empty':           { bn: 'ইউজারনেম ও পাসওয়ার্ড দুটোই লেখো।', en: 'Enter both username and password.' },
-  'bad-credentials': { bn: 'ইউজারনেম বা পাসওয়ার্ড ভুল।',       en: 'Incorrect username or password.' }
-};
+/*
+ * Every failed sign-in shows the same sentence, whether the username was wrong,
+ * the password was wrong, or a field was left blank. That is deliberate: it
+ * matches the requested wording and it stops the form being used to work out
+ * which usernames exist.
+ */
+const LOGIN_ERROR_BN = 'ইউজারনেম বা পাসওয়ার্ড ভুল হয়েছে!';
+const LOGIN_ERROR_EN = 'Incorrect username or password!';
 
 async function adminLogin(){
   const msg = document.getElementById('adminLoginMsg');
@@ -45,10 +49,8 @@ async function adminLogin(){
     await window.adminAuth.login(username, password);
     enterAdminDashboard();
   }catch(err){
-    // Deliberately identical wording for a wrong username and a wrong password,
-    // so the form cannot be used to discover valid usernames.
-    const e = LOGIN_ERRORS[err.code] || { bn: 'লগইন ব্যর্থ হয়েছে।', en: 'Login failed.' };
-    msg.innerHTML = '<div class="msg err"><span class="bn">' + e.bn + '</span><span class="en">' + e.en + '</span></div>';
+    msg.innerHTML = '<div class="msg err"><span class="bn">' + LOGIN_ERROR_BN +
+      '</span><span class="en">' + LOGIN_ERROR_EN + '</span></div>';
     document.getElementById('adminPassInput').value = '';
     document.getElementById('adminPassInput').focus();
   }
@@ -107,16 +109,17 @@ async function changeAdminPassword(){
   }
 }
 
-/** Forgotten password escape hatch — back to admin / admin123. */
+/** Forgotten password escape hatch — back to the shipped default credentials. */
 async function resetAdminPassword(){
   if(!adminLoggedIn) return;
-  const ok = window.confirm('পাসওয়ার্ড ডিফল্টে (admin / admin123) ফিরিয়ে নেবে?\n\nReset the password back to admin / admin123?');
+  const u = window.adminAuth.DEFAULT_USERNAME, pw = window.adminAuth.DEFAULT_PASSWORD;
+  const ok = window.confirm('পাসওয়ার্ড ডিফল্টে (' + u + ' / ' + pw + ') ফিরিয়ে নেবে?\n\nReset the password back to ' + u + ' / ' + pw + '?');
   if(!ok) return;
   await window.adminAuth.resetToDefaults();
   renderAdminIdentity();
   document.getElementById('adminPassMsg').innerHTML =
-    '<div class="msg ok"><span class="bn">পাসওয়ার্ড ডিফল্টে ফিরে গেছে: admin / admin123</span>' +
-    '<span class="en">Password reset to the default: admin / admin123</span></div>';
+    '<div class="msg ok"><span class="bn">পাসওয়ার্ড ডিফল্টে ফিরে গেছে: ' + u + ' / ' + pw + '</span>' +
+    '<span class="en">Password reset to the default: ' + u + ' / ' + pw + '</span></div>';
 }
 
 /* Wire the forms. Submit handlers (not click) so Enter works in every field. */

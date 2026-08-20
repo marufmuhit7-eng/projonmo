@@ -164,3 +164,87 @@
   .footer-links a:hover,.footer-links a:focus-visible{
     color:rgba(241,233,216,0.85);border-bottom-color:var(--brass);
   }
+
+  /* ================= Team & sponsors ================= */
+  .credit-block{margin-top:52px;}
+  .credit-block:first-of-type{margin-top:34px;}
+  .credit-head{
+    display:flex;align-items:center;gap:14px;margin-bottom:20px;
+  }
+  .credit-head h3{margin:0;font-size:1.12rem;white-space:nowrap;}
+  .credit-head::after{
+    content:"";flex:1;height:1px;
+    background:linear-gradient(to right, rgba(142,106,46,0.45), transparent);
+  }
+
+  /* --- Tier 1: title sponsor, premium framing --- */
+  .tier-title{
+    max-width:430px;margin:0 auto;text-align:center;padding:36px 28px;
+    background:linear-gradient(160deg, #FFFDF6 0%, var(--cream) 100%);
+    border:2px solid var(--brass);border-radius:3px;position:relative;
+    box-shadow:0 3px 0 rgba(142,106,46,0.22), 0 14px 34px rgba(42,32,21,0.13);
+    transition:transform .2s ease, box-shadow .2s ease;
+  }
+  .tier-title::before{
+    content:"";position:absolute;inset:6px;border:1px solid rgba(142,106,46,0.34);
+    border-radius:2px;pointer-events:none;
+  }
+  .tier-title:hover{transform:translateY(-4px);box-shadow:0 3px 0 rgba(142,106,46,0.22), 0 20px 44px rgba(42,32,21,0.2);}
+  .tier-title img{width:150px;height:150px;object-fit:contain;display:block;margin:0 auto 18px;}
+
+  /* --- Tier 2: co-organizer, same language, quieter --- */
+  .tier-co{
+    max-width:340px;margin:0 auto;text-align:center;padding:26px 22px;
+    background:#FFFDF6;border:1px solid rgba(142,106,46,0.42);border-radius:3px;
+    box-shadow:0 8px 22px rgba(42,32,21,0.09);
+    transition:transform .2s ease, box-shadow .2s ease;
+  }
+  .tier-co:hover{transform:translateY(-3px);box-shadow:0 14px 30px rgba(42,32,21,0.15);}
+  .tier-co img{width:104px;height:104px;object-fit:contain;display:block;margin:0 auto 14px;}
+
+  .credit-name{font-family:var(--f-disp-bn),var(--f-disp-en);font-size:1.22rem;font-weight:700;margin:0 0 10px;line-height:1.35;}
+  .tier-co .credit-name{font-size:1.05rem;}
+  .credit-tag{
+    display:inline-block;font-size:0.74rem;font-weight:700;letter-spacing:.04em;
+    padding:5px 15px;border-radius:20px;background:var(--brass);color:var(--cream);
+  }
+  .tier-co .credit-tag{background:var(--indigo);}
+
+  /* --- Tier 3: organising committee --- */
+  .people-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;}
+  .person{
+    text-align:center;padding:28px 20px;background:#FFFDF6;
+    border:1px solid rgba(36,28,21,0.14);border-top:3px solid var(--clay);border-radius:3px;
+    box-shadow:0 6px 18px rgba(42,32,21,0.07);
+    transition:transform .2s ease, box-shadow .2s ease;
+  }
+  .person:hover{transform:translateY(-4px);box-shadow:0 16px 34px rgba(42,32,21,0.16);}
+  .person img{
+    width:120px;height:120px;border-radius:50%;object-fit:cover;object-position:50% 28%;
+    display:block;margin:0 auto 16px;border:3px solid var(--cream-2);
+    box-shadow:0 0 0 2px var(--brass);
+  }
+  .person .credit-name{font-size:1.08rem;margin-bottom:8px;}
+  .person .credit-tag{background:var(--clay);}
+
+  /* --- Tier 4: sponsors --- */
+  .sponsor-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+  .sponsor{
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+    text-align:center;padding:24px 16px;background:#fff;
+    border:1px solid rgba(36,28,21,0.13);border-radius:3px;
+    box-shadow:0 4px 14px rgba(42,32,21,0.07);
+    transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  }
+  .sponsor:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(42,32,21,0.15);border-color:var(--brass);}
+  .sponsor img{width:96px;height:96px;object-fit:contain;display:block;margin-bottom:14px;}
+  .sponsor span{font-size:0.9rem;font-weight:600;line-height:1.45;}
+
+  @media(max-width:700px){
+    .people-grid{grid-template-columns:1fr;}
+    .sponsor-grid{grid-template-columns:repeat(2,1fr);}
+    .credit-block{margin-top:40px;}
+    .credit-head h3{font-size:1.02rem;white-space:normal;}
+    .tier-title{padding:28px 20px;}
+    .tier-title img{width:120px;height:120px;}
+  }

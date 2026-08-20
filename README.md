@@ -120,6 +120,23 @@ makes this real authentication — see the security note above.
 
 `js/auth.js` is only shipped to `admin.html`; the public page never loads it.
 
+## Team & sponsors
+
+The **টিম** tab renders four tiers, largest first, from
+`src/public/body.html` + the `.credit-*` / `.tier-*` / `.person` / `.sponsor`
+rules in `src/shared/styles.css`:
+
+| Tier | Card | Image |
+| --- | --- | --- |
+| প্রধান সমন্বয়কারী ও টাইটেল স্পন্সর | wide centred card, double brass border, 150px logo | `projonmo-logo.jpg` |
+| সহ-আয়োজক | narrower card, single border, 104px logo | `normative-logo.jpg` |
+| আয়োজক দল | two circular-portrait cards, 2 columns → 1 on mobile | `muhit.jpg`, `watan.jpg` |
+| আমাদের পৃষ্ঠপোষকবৃন্দ | white logo cards, 3 columns → 2 on mobile | `rcc.jpg`, `dnc.jpg`, `royalty.jpg` |
+
+Every image carries `alt`, explicit `width`/`height` (no layout shift) and
+`loading="lazy"`. To swap a logo, drop the replacement into
+`src/shared/images/` under the same filename and run `npm run build`.
+
 ## Exam timer control (admin-managed)
 
 The countdown is no longer hardcoded. The organiser controls it from
@@ -237,7 +254,7 @@ Run step 6's `curl` checks after configuring, before the event.
 │   │   ├── storage.js
 │   │   ├── common.js                     QUESTIONS, CATEGORY_LABELS, getCategoryKey
 │   │   ├── footer.html
-│   │   └── images/
+│   │   └── images/                       logos + committee photos
 │   ├── public/{body.html, app.js}
 │   └── admin/{section.html, admin.js}
 │
@@ -261,8 +278,8 @@ Run step 6's `curl` checks after configuring, before the event.
 │   ├── carve.py                          one-time migration, kept for provenance
 │   ├── storage.test.js                   9 assertions
 │   ├── settings.test.js                  32 assertions
-│   ├── auth.test.js                      36 assertions
-│   └── apps.test.js                      97 assertions
+│   ├── auth.test.js                      41 assertions
+│   └── apps.test.js                      114 assertions
 └── package.json
 ```
 
@@ -404,7 +421,7 @@ Checklist:
 ```bash
 npm run build     # regenerate index.html, admin.html and assets from src/
 npm run dev       # site on :8000, /admin included (mirrors vercel.json)
-npm test          # 9 + 32 + 36 + 97 assertions (needs the dev server + jsdom)
+npm test          # 9 + 32 + 41 + 114 assertions (needs the dev server + jsdom)
 ```
 
 ```bash
