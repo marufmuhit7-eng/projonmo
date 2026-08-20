@@ -139,12 +139,34 @@ function load(urlPath) {
   check('date & time picker present', adoc.getElementById('timerDateInput')?.type === 'datetime-local');
   check('off-behaviour select offers live and message',
     [...(adoc.getElementById('timerOffBehaviorInput')?.options || [])].map((o) => o.value).join(',') === 'live,message');
+  check('admin badge reports EXAM status, not just timer state',
+    typeof adm.window.renderTimerStatus === 'function' &&
+    !!adoc.getElementById('timerStatusDetail'));
   check('bilingual custom message fields + Save + status badge',
     !!adoc.getElementById('timerMessageBnInput') && !!adoc.getElementById('timerMessageEnInput') &&
     !!adoc.getElementById('timerSaveBtn') && !!adoc.getElementById('timerStatusBadge'));
 
   const gate = (s) => pw.renderExamGate(pw.examSettings.normalise(s));
   const vis = (id) => !pdoc.getElementById(id).classList.contains('hidden');
+
+  // --- the exam must be OPEN out of the box -----------------------------
+  check('UNLOCKED BY DEFAULT: shipped settings put the exam live',
+    pw.examSettings.examStatus(pw.examSettings.DEFAULTS) === 'live');
+  gate(pw.examSettings.DEFAULTS);
+  check('default render: countdown box hidden', !vis('countdownBox'));
+  check('default render: "পরীক্ষা এখনো শুরু হয়নি" panel hidden', !vis('examLocked'));
+  check('default render: start-exam form visible', vis('examLogin'));
+  check('default render: Start Exam button present',
+    /পরীক্ষা শুরু করো/.test(pdoc.getElementById('examLogin').textContent) &&
+    /Start Exam/.test(pdoc.getElementById('examLogin').textContent));
+  check('default render: LIVE badge shown to candidates',
+    /পরীক্ষা চালু আছে/.test(pdoc.getElementById('examLogin').textContent));
+  check('default render: exam rules listed (6 items, bn + en)',
+    pdoc.querySelectorAll('#examLogin ol.bn > li').length === 6 &&
+    pdoc.querySelectorAll('#examLogin ol.en > li').length === 6);
+  check('default render: question container and submit button exist',
+    !!pdoc.getElementById('questionsContainer') &&
+    /জমা দাও/.test(pdoc.getElementById('examBody').textContent));
   const FUTURE = '2099-01-01T00:00:00+06:00';
   const PAST = '2000-01-01T00:00:00+06:00';
 

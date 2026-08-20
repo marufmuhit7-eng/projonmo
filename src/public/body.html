@@ -201,14 +201,43 @@
     </div>
 
     <div id="examLogin" class="form-box hidden">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+        <span style="display:inline-flex;align-items:center;gap:7px;background:var(--sage);color:var(--cream);font-weight:700;font-size:0.8rem;padding:5px 13px;border-radius:20px;white-space:nowrap;">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--cream);display:inline-block;"></span>
+          <span class="bn">পরীক্ষা চালু আছে</span><span class="en">Exam is live</span>
+        </span>
+      </div>
       <p class="bn" style="margin-top:0;color:rgba(36,28,21,0.75);">পরীক্ষা শুরু করতে তোমার রেজিস্ট্রেশন আইডি লেখো।</p>
       <p class="en" style="margin-top:0;color:rgba(36,28,21,0.75);">Enter your registration ID to begin the exam.</p>
+
+      <div style="background:var(--cream-2);border-left:3px solid var(--brass);padding:14px 16px;border-radius:2px;margin:16px 0 20px;">
+        <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;">
+          <span class="bn">পরীক্ষার নিয়ম</span><span class="en">Exam rules</span>
+        </div>
+        <ol class="bn" style="margin:0;padding-left:20px;font-size:0.88rem;line-height:1.75;">
+          <li>সব প্রশ্ন বহুনির্বাচনী — প্রতিটিতে ৪টি অপশন, একটি সঠিক।</li>
+          <li>মোট সময় <strong>১০ মিনিট</strong>। সময় শেষ হলে উত্তরপত্র নিজে থেকেই জমা হয়ে যাবে।</li>
+          <li>প্রতিটি আইডি দিয়ে <strong>একবারই</strong> পরীক্ষা দেওয়া যাবে।</li>
+          <li>উত্তর সিলেক্ট করার সাথে সাথেই সঠিক/ভুল দেখা যাবে।</li>
+          <li>তোমার শ্রেণী অনুযায়ী প্রশ্ন আসবে — প্রাইমারি, জুনিয়র বা সিনিয়র।</li>
+          <li>জমা দেওয়ার পর ফলাফল লিডারবোর্ডে যোগ হবে।</li>
+        </ol>
+        <ol class="en" style="margin:0;padding-left:20px;font-size:0.88rem;line-height:1.75;">
+          <li>All questions are multiple choice — four options, one correct.</li>
+          <li>You get <strong>10 minutes</strong>. The paper submits itself when time runs out.</li>
+          <li>Each ID may attempt the exam <strong>once only</strong>.</li>
+          <li>Correct or incorrect is shown the moment you pick an answer.</li>
+          <li>Questions match your class group — Primary, Junior or Senior.</li>
+          <li>Your score is added to the leaderboard after you submit.</li>
+        </ol>
+      </div>
+
       <label><span class="bn">অংশগ্রহণকারী আইডি</span><span class="en">Participant ID</span></label>
       <input type="text" id="examIdInput" placeholder="UHF-XXXXXX">
       <button class="btn btn-primary" style="margin-top:18px;" onclick="startExam()"><span class="bn">পরীক্ষা শুরু করো</span><span class="en">Start Exam</span></button>
       <div id="examLoginMsg"></div>
-      <p class="small-note bn">বহুনির্বাচনী প্রশ্ন • সময়সীমা ১০ মিনিট • একবারই দেওয়া যাবে • উত্তর সিলেক্ট করার সাথে সাথেই সঠিক/ভুল দেখা যাবে</p>
-      <p class="small-note en">Multiple choice • 10 minute time limit • one attempt only • correct/incorrect shown instantly as you answer</p>
+      <p class="small-note bn">রেজিস্ট্রেশন করা না থাকলে আগে <strong>রেজিস্ট্রেশন</strong> ট্যাব থেকে আইডি নিয়ে নাও।</p>
+      <p class="small-note en">Not registered yet? Get your ID from the <strong>Register</strong> tab first.</p>
     </div>
 
     <div id="examBody" class="hidden">

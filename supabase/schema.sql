@@ -6,7 +6,7 @@
 -- 1. The table. One row, id = 1, holds every timer setting.
 create table if not exists public.settings (
   id                integer      primary key default 1,
-  timer_enabled     boolean      not null default true,
+  timer_enabled     boolean      not null default false,  -- false = exam OPEN
   exam_start_date   timestamptz  not null default '2026-09-25T00:00:00+06:00',
   off_behavior      text         not null default 'live',
   custom_message    text         not null default '',
@@ -18,7 +18,8 @@ create table if not exists public.settings (
   constraint settings_off_behavior_valid check (off_behavior in ('live', 'message'))
 );
 
--- 2. Seed the single row.
+-- 2. Seed the single row. Defaults leave the exam OPEN; lock it from the
+--    admin panel by switching the countdown on.
 insert into public.settings (id) values (1)
 on conflict (id) do nothing;
 

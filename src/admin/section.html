@@ -56,9 +56,10 @@
           <!-- Current status at a glance -->
           <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:18px 0 24px;padding:14px 16px;background:var(--cream-2);border-radius:2px;">
             <span id="timerStatusBadge" style="font-weight:700;padding:6px 14px;border-radius:20px;font-size:0.85rem;white-space:nowrap;">…</span>
-            <div style="font-size:0.88rem;line-height:1.5;">
-              <div class="bn">বর্তমান পরীক্ষার তারিখ: <strong id="timerCurrentDateBn" style="font-family:var(--f-mono);">…</strong></div>
-              <div class="en">Current exam date: <strong id="timerCurrentDateEn" style="font-family:var(--f-mono);">…</strong></div>
+            <div style="font-size:0.88rem;line-height:1.5;flex:1;min-width:220px;">
+              <div id="timerStatusDetail" style="margin-bottom:4px;"></div>
+              <div class="bn" style="color:rgba(36,28,21,0.65);">নির্ধারিত তারিখ: <strong id="timerCurrentDateBn" style="font-family:var(--f-mono);">…</strong></div>
+              <div class="en" style="color:rgba(36,28,21,0.65);">Scheduled date: <strong id="timerCurrentDateEn" style="font-family:var(--f-mono);">…</strong></div>
             </div>
           </div>
 
@@ -69,8 +70,8 @@
               <span class="switch-track"><span class="switch-thumb"></span></span>
             </label>
             <label for="timerEnabledInput" style="cursor:pointer;margin:0;font-weight:400;">
-              <span class="bn"><strong>কাউন্টডাউন টাইমার দেখাও</strong> — বন্ধ করলে পরীক্ষার পাতা থেকে টাইমার বক্স পুরোপুরি লুকিয়ে যাবে।</span>
-              <span class="en"><strong>Show the countdown timer</strong> — when off, the countdown box is hidden completely.</span>
+              <span class="bn"><strong>কাউন্টডাউন টাইমার দেখাও (পরীক্ষা লক করো)</strong> — চালু করলে নির্ধারিত তারিখ পর্যন্ত পরীক্ষা বন্ধ থাকবে ও কাউন্টডাউন দেখাবে। বন্ধ রাখলে পরীক্ষা এখনই চালু (LIVE)।</span>
+              <span class="en"><strong>Show the countdown (lock the exam)</strong> — on: the exam stays closed until the date below and a countdown is shown. Off: the exam is LIVE right now.</span>
             </label>
           </div>
 

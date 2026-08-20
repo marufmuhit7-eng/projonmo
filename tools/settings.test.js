@@ -40,7 +40,9 @@ function check(label, cond, detail) {
 
   // ---- defaults -------------------------------------------------------
   const d = await S.load();
-  check('fresh browser falls back to defaults', d.timerEnabled === true && d.offBehavior === 'live', d);
+  check('SHIPPED DEFAULT: exam is OPEN — no countdown, no lock',
+    d.timerEnabled === false && d.offBehavior === 'live', d);
+  check('examStatus() on defaults is "live"', S.examStatus(d) === 'live', S.examStatus(d));
   check('default exam date is the original 25 Sep 2026 +06:00',
     d.examStartDate === '2026-09-25T00:00:00+06:00', d.examStartDate);
 
@@ -71,12 +73,22 @@ function check(label, cond, detail) {
     S.fromDhakaInput('2026-02-30T10:00'));
 
   // ---- normalise guards ----------------------------------------------
-  check('normalise: junk object falls back to defaults', S.normalise({ timerEnabled: 'yes' }).timerEnabled === true);
+  check('normalise: junk object falls back to defaults', S.normalise({ timerEnabled: 'yes' }).timerEnabled === false);
+
+  // ---- examStatus across every combination -----------------------------
+  check('examStatus: timer off + live -> live',
+    S.examStatus({ timerEnabled: false, offBehavior: 'live' }) === 'live');
+  check('examStatus: timer off + message -> closed',
+    S.examStatus({ timerEnabled: false, offBehavior: 'message' }) === 'closed');
+  check('examStatus: timer on + future date -> countdown',
+    S.examStatus({ timerEnabled: true, examStartDate: '2099-01-01T00:00:00+06:00' }) === 'countdown');
+  check('examStatus: timer on + past date -> live',
+    S.examStatus({ timerEnabled: true, examStartDate: '2000-01-01T00:00:00+06:00' }) === 'live');
   check('normalise: bad date falls back to the default date',
     S.normalise({ examStartDate: 'lol' }).examStartDate === S.DEFAULTS.examStartDate);
   check('normalise: unknown offBehavior collapses to "live"',
     S.normalise({ offBehavior: 'explode' }).offBehavior === 'live');
-  check('normalise: null is safe', S.normalise(null).timerEnabled === true);
+  check('normalise: null is safe', S.normalise(null).timerEnabled === false);
 
   // ---- Bangla rendering (design must not change) ----------------------
   check('formatBnDateTime renders Bangla digits and month',

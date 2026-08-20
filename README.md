@@ -100,11 +100,15 @@ The countdown is no longer hardcoded. The organiser controls it from
 
 | Control | Bengali label | Effect |
 | --- | --- | --- |
-| ON/OFF toggle | কাউন্টডাউন টাইমার দেখাও | Off hides the countdown box completely |
+| ON/OFF toggle | কাউন্টডাউন টাইমার দেখাও (পরীক্ষা লক করো) | **Off = exam LIVE now.** On = locked until the date below |
 | Date & time picker | পরীক্ষা শুরুর তারিখ ও সময় | The moment the exam opens (Bangladesh time) |
 | Off behaviour | টাইমার বন্ধ থাকলে কী হবে? | `live` = exam open now · `message` = show a notice |
 | Message (bn / en) | বার্তা | Shown when the timer is off and behaviour is `message` |
-| Status badge | টাইমার চালু / টাইমার বন্ধ | Current state at a glance |
+| Status badge | পরীক্ষা চালু · LIVE / লকড · COUNTDOWN / লকড · CLOSED | What a candidate sees right now, in one line |
+
+**Shipped default: the exam is LIVE.** A fresh visitor sees the rules and the
+"পরীক্ষা শুরু করো" button, not a countdown. Lock it by switching the countdown
+on in the admin panel.
 
 Behaviour on the exam page:
 
@@ -188,7 +192,7 @@ drops. On the localStorage fallback, only other tabs of the same origin get the
 The Supabase code path could not be exercised here — there is no live project to
 point it at. Verified instead: API shapes against the current supabase-js v2
 docs, and every branch of the settings layer, the date/timezone conversion and
-all three exam-gate states against the localStorage backend (101 assertions).
+all three exam-gate states against the localStorage backend (102 assertions).
 Run step 6's `curl` checks after configuring, before the event.
 
 ---
@@ -228,8 +232,8 @@ Run step 6's `curl` checks after configuring, before the event.
 │   ├── serve.py                          dev server that mirrors vercel.json
 │   ├── carve.py                          one-time migration, kept for provenance
 │   ├── storage.test.js                   9 assertions
-│   ├── settings.test.js                  27 assertions
-│   └── apps.test.js                      52 assertions
+│   ├── settings.test.js                  32 assertions
+│   └── apps.test.js                      61 assertions
 └── package.json
 ```
 
@@ -368,7 +372,7 @@ Checklist:
 ```bash
 npm run build     # regenerate index.html, admin.html and assets from src/
 npm run dev       # site on :8000, /admin included (mirrors vercel.json)
-npm test          # 9 + 27 + 52 assertions (needs the dev server + jsdom)
+npm test          # 9 + 32 + 61 assertions (needs the dev server + jsdom)
 ```
 
 ```bash

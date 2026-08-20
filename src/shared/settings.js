@@ -35,8 +35,16 @@
   var TABLE = 'settings';
   var ROW_ID = 1;
 
+  /*
+   * Shipped defaults = exam OPEN. A visitor who has never had settings pushed
+   * to them (fresh browser, or no Supabase row yet) can sit the exam straight
+   * away. Lock it again from the admin panel by switching the countdown on.
+   *
+   * examStartDate is only consulted while timerEnabled is true; it is kept so
+   * the organiser has a sensible value pre-filled in the date picker.
+   */
   var DEFAULTS = {
-    timerEnabled: true,
+    timerEnabled: false,
     examStartDate: '2026-09-25T00:00:00' + TZ,
     offBehavior: 'live',
     customMessage: '',
@@ -125,6 +133,20 @@
     var h12 = h24 % 12 === 0 ? 12 : h24 % 12;
     return toBnDigits(Number(d[2])) + ' ' + BN_MONTHS[Number(d[1]) - 1] + ', ' +
       toBnDigits(d[0]) + ', ' + toBnDigits(pad(h12)) + ':' + toBnDigits(t[1]) + ' ' + ampm;
+  }
+
+  /**
+   * Reduce the raw settings to the one thing everybody actually asks:
+   * can a candidate sit the exam right now?
+   *
+   * 'live'      -> exam is open, the countdown box is hidden
+   * 'countdown' -> locked, counting down to examStartDate
+   * 'closed'    -> locked, showing the organiser's message
+   */
+  function examStatus(s) {
+    var n = normalise(s);
+    if (!n.timerEnabled) return n.offBehavior === 'message' ? 'closed' : 'live';
+    return new Date() < new Date(n.examStartDate) ? 'countdown' : 'live';
   }
 
   // -------------------------------------------------------- local backend
@@ -298,6 +320,7 @@
 
     // --- exposed for the admin form and for tests ------------------------
     normalise: normalise,
+    examStatus: examStatus,
     toDhakaInput: toDhakaInput,
     fromDhakaInput: fromDhakaInput,
     formatBnDateTime: formatBnDateTime,

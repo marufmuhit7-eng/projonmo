@@ -65,15 +65,27 @@ function syncTimerMessageVisibility(){
 /** Repaint the status badge + current-date line from a settings object. */
 function renderTimerStatus(s){
   const badge = document.getElementById('timerStatusBadge');
-  if(s.timerEnabled){
-    badge.textContent = 'টাইমার চালু · Timer ON';
-    badge.style.background = 'var(--sage)';
-    badge.style.color = 'var(--cream)';
-  }else{
-    badge.textContent = 'টাইমার বন্ধ · Timer OFF';
-    badge.style.background = 'var(--stone)';
-    badge.style.color = 'var(--cream)';
-  }
+  const detail = document.getElementById('timerStatusDetail');
+
+  // Report what a CANDIDATE sees right now, not just whether a timer is ticking.
+  const status = window.examSettings.examStatus(s);
+  const view = {
+    live:      { text: 'পরীক্ষা চালু · LIVE',      bg: 'var(--sage)',  fg: 'var(--cream)',
+                 bn: 'এখন যে কেউ পরীক্ষা শুরু করতে পারবে। কাউন্টডাউন বক্স লুকানো আছে।',
+                 en: 'Anyone can start the exam now. The countdown box is hidden.' },
+    countdown: { text: 'লকড · COUNTDOWN',          bg: 'var(--clay)',  fg: 'var(--cream)',
+                 bn: 'পরীক্ষা বন্ধ। নিচের তারিখ পর্যন্ত কাউন্টডাউন দেখা যাচ্ছে, তারপর নিজে থেকেই খুলে যাবে।',
+                 en: 'Locked. The countdown runs to the date below, then the exam opens by itself.' },
+    closed:    { text: 'লকড · CLOSED',             bg: 'var(--stone)', fg: 'var(--cream)',
+                 bn: 'পরীক্ষা বন্ধ। কাউন্টডাউনের বদলে তোমার লেখা বার্তাটি দেখানো হচ্ছে।',
+                 en: 'Locked. Your message is shown instead of a countdown.' }
+  }[status];
+
+  badge.textContent = view.text;
+  badge.style.background = view.bg;
+  badge.style.color = view.fg;
+  detail.innerHTML = '<span class="bn">' + view.bn + '</span><span class="en">' + view.en + '</span>';
+
   document.getElementById('timerCurrentDateBn').textContent = window.examSettings.formatBnDateTime(s.examStartDate);
   document.getElementById('timerCurrentDateEn').textContent =
     new Date(s.examStartDate).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
