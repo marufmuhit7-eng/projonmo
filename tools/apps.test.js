@@ -120,7 +120,15 @@ const text = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
   check('admin has a "টাইমার নিয়ন্ত্রণ" sub-tab', !!adoc.querySelector('[data-sub="timer"]'));
   check('admin timer panel exists and starts hidden',
     adoc.getElementById('adminTimer')?.classList.contains('hidden'));
-  check('ON/OFF toggle present', adoc.getElementById('timerEnabledInput')?.type === 'checkbox');
+  check('section is titled "পরীক্ষার টাইমার নিয়ন্ত্রণ" / "Exam Timer Control"',
+    /পরীক্ষার টাইমার নিয়ন্ত্রণ/.test(adoc.getElementById('adminTimer').textContent) &&
+    /Exam Timer Control/.test(adoc.getElementById('adminTimer').textContent));
+  check('ON/OFF control is a real toggle SWITCH, not a bare checkbox',
+    adoc.getElementById('timerEnabledInput')?.type === 'checkbox' &&
+    !!adoc.querySelector('label.switch > #timerEnabledInput + .switch-track > .switch-thumb'));
+  check('switch has styles shipped in both builds',
+    text('admin-panel/css/styles.css').includes('.switch input:checked + .switch-track') &&
+    text('public-site/css/styles.css').includes('.switch-track'));
   check('date & time picker present', adoc.getElementById('timerDateInput')?.type === 'datetime-local');
   check('off-behaviour select offers both live and message',
     [...(adoc.getElementById('timerOffBehaviorInput')?.options || [])].map((o) => o.value).join(',') === 'live,message');

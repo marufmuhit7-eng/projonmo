@@ -76,6 +76,8 @@
       <div id="adminTimer" class="hidden">
         <div class="form-box" style="max-width:100%;">
 
+          <h3 style="margin-top:0;"><span class="bn">পরীক্ষার টাইমার নিয়ন্ত্রণ</span><span class="en">Exam Timer Control</span></h3>
+
           <!-- Which backend is actually live right now -->
           <div id="timerBackendNote" class="small-note" style="margin-top:0;"></div>
 
@@ -89,13 +91,16 @@
           </div>
 
           <!-- ON / OFF -->
-          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;">
-            <input type="checkbox" id="timerEnabledInput" style="width:20px;height:20px;accent-color:var(--clay);cursor:pointer;flex:0 0 auto;">
-            <span>
+          <div style="display:flex;align-items:center;gap:14px;">
+            <label class="switch" for="timerEnabledInput" aria-label="Show the countdown timer">
+              <input type="checkbox" id="timerEnabledInput">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+            <label for="timerEnabledInput" style="cursor:pointer;margin:0;font-weight:400;">
               <span class="bn"><strong>কাউন্টডাউন টাইমার দেখাও</strong> — বন্ধ করলে পরীক্ষার পাতা থেকে টাইমার বক্স পুরোপুরি লুকিয়ে যাবে।</span>
               <span class="en"><strong>Show the countdown timer</strong> — when off, the countdown box is hidden completely.</span>
-            </span>
-          </label>
+            </label>
+          </div>
 
           <!-- Exam start date -->
           <label style="margin-top:22px;"><span class="bn">পরীক্ষা শুরুর তারিখ ও সময় (বাংলাদেশ সময়)</span><span class="en">Exam start date &amp; time (Bangladesh time)</span></label>
