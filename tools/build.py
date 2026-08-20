@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """
-build.py — generate the two deployable folders from src/.
+build.py — generate the single deployable site from src/, into the repo root.
 
-  src/  ->  public-site/     (deployment A, e.g. heritagefest.example.com)
-        ->  admin-panel/     (deployment B, e.g. admin.heritagefest.example.com)
+  src/  ->  index.html      public site  (served at /)
+            admin.html      admin panel  (served at /admin via cleanUrls)
+            404.html
+            css/ js/ images/ robots.txt
 
-Shared assets (styles.css, storage.js, common.js, images/) are COPIED into both
-folders rather than referenced across them, because a Vercel project's Root
-Directory cannot read files above itself. src/ stays the single place you edit;
-run this script after every change so the two folders never drift.
+Everything is emitted at the repo root so Vercel needs NO Root Directory
+setting: import the repo, click Deploy, done. tools/, src/ and supabase/ are
+kept out of the deployment by .vercelignore.
+
+index.html and admin.html sit at the same depth, so both use the identical
+relative asset paths (./css/…, ./js/…, ./images/…) and nothing needs rewriting.
 
 Run:  python3 tools/build.py     (or: npm run build)
 """
@@ -22,6 +26,8 @@ import shutil
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"
 
+LOGO = "heritage-fest-logo-708214d0.jpg"
+
 FONTS = (
     '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
@@ -31,8 +37,6 @@ FONTS = (
     "&family=Inter:wght@400;500;600;700"
     '&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">'
 )
-
-LOGO = "heritage-fest-logo-708214d0.jpg"
 
 # supabase-js is only pulled in when a backend is actually configured, so an
 # unconfigured build makes zero third-party requests.
@@ -44,6 +48,7 @@ def supabase_configured() -> bool:
     cfg = (SRC / "shared" / "config.js").read_text(encoding="utf-8")
     m = re.search(r"SUPABASE_URL:\s*'([^']*)'", cfg)
     return bool(m and m.group(1).strip())
+
 
 PUBLIC_HEAD = f"""<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -70,8 +75,8 @@ ADMIN_HEAD = f"""<meta charset="UTF-8">
 {FONTS}
 <link rel="stylesheet" href="./css/styles.css">"""
 
-# Admin nav: brand + language toggle only. No tab bar, and deliberately no link
-# back to the public site (and the public site has no link here either).
+# Admin nav: brand + language toggle. No tab bar. There is deliberately no link
+# from the public navigation to here, even though both now live on one domain.
 ADMIN_NAV = f"""<nav class="topnav">
   <div class="nav-inner">
     <div class="brand">
@@ -84,7 +89,7 @@ ADMIN_NAV = f"""<nav class="topnav">
 
 # Vercel serves 404.html from the output directory whenever no static file
 # matches. Without it the visitor gets Vercel's raw plain-text "404: NOT_FOUND".
-PUBLIC_404 = f"""<!DOCTYPE html>
+NOT_FOUND = f"""<!DOCTYPE html>
 <html lang="bn">
 <head>
 <meta charset="UTF-8">
@@ -109,6 +114,7 @@ PUBLIC_404 = f"""<!DOCTYPE html>
   <a href="/" class="btn btn-primary" style="text-decoration:none;">
     <span class="bn">হোমে ফিরে যাও</span><span class="en">Back to home</span>
   </a>
+  <button class="lang-toggle" style="margin-top:26px;" onclick="document.body.classList.toggle('lang-bn');document.body.classList.toggle('lang-en');">EN / বাং</button>
 </main>
 <footer>
   <div class="wrap">
@@ -116,30 +122,101 @@ PUBLIC_404 = f"""<!DOCTYPE html>
     <span class="en">Uttarbanga Heritage Fest © 2026</span>
   </div>
 </footer>
-<script>
-  document.querySelector('a.btn').insertAdjacentHTML('afterend',
-    '<button class="lang-toggle" style="margin-top:26px;" onclick="document.body.classList.toggle(\\'lang-bn\\');document.body.classList.toggle(\\'lang-en\\');">EN / বাং</button>');
-</script>
 </body>
 </html>
 """
 
-# The admin 404 deliberately says nothing about what this deployment is.
-ADMIN_404 = """<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>404</title>
-<meta name="robots" content="noindex, nofollow">
-<meta name="referrer" content="no-referrer">
-<style>
-  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
-       background:#151A28;color:#8C8270;font:500 14px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;}
-</style>
-</head>
-<body>404</body>
-</html>
+# Crawlers are told to stay out of the admin route. This is a request, not a
+# control — see the security notes in README.
+ROBOTS = """User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin.html
+"""
+
+VERCEL_JSON = {
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "framework": None,
+    "buildCommand": 'echo "Static site — nothing to build."',
+    "installCommand": 'echo "No dependencies."',
+    "outputDirectory": ".",
+    # cleanUrls alone maps /admin -> admin.html and 308-redirects /admin.html
+    # to /admin. No rewrite is needed, and a catch-all rewrite must NOT be added:
+    # this site routes with buttons, not URLs, so it would only mask real 404s.
+    "cleanUrls": True,
+    "trailingSlash": False,
+    "headers": [
+        # Applies everywhere. Only carries headers that no other rule overrides,
+        # so nothing is ever sent twice with conflicting values.
+        {
+            "source": "/(.*)",
+            "headers": [
+                {"key": "X-Content-Type-Options", "value": "nosniff"},
+                {"key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()"},
+            ],
+        },
+        # Framing and referrer policy for everything EXCEPT the admin route,
+        # which needs stricter values. The negative lookahead keeps the two
+        # rules from both matching /admin and emitting duplicate headers.
+        {
+            "source": "/:path((?!admin).*)",
+            "headers": [
+                {"key": "X-Frame-Options", "value": "SAMEORIGIN"},
+                {"key": "Referrer-Policy", "value": "strict-origin-when-cross-origin"},
+            ],
+        },
+        # The admin route is hardened even though it shares the domain.
+        {
+            "source": "/admin",
+            "headers": [
+                {"key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive, nosnippet, noimageindex"},
+                {"key": "Cache-Control", "value": "no-store, max-age=0, must-revalidate"},
+                {"key": "X-Frame-Options", "value": "DENY"},
+                {"key": "Referrer-Policy", "value": "no-referrer"},
+            ],
+        },
+        {
+            "source": "/admin.html",
+            "headers": [
+                {"key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive, nosnippet, noimageindex"},
+                {"key": "Cache-Control", "value": "no-store, max-age=0, must-revalidate"},
+                {"key": "X-Frame-Options", "value": "DENY"},
+                {"key": "Referrer-Policy", "value": "no-referrer"},
+            ],
+        },
+        # admin.js carries the admin logic; keep it out of search results too.
+        {
+            "source": "/js/admin.js",
+            "headers": [
+                {"key": "X-Robots-Tag", "value": "noindex, nofollow"},
+                {"key": "Cache-Control", "value": "no-store, max-age=0, must-revalidate"},
+            ],
+        },
+        {
+            "source": "/images/:path*",
+            "headers": [{"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}],
+        },
+        {
+            "source": "/css/:path*",
+            "headers": [{"key": "Cache-Control", "value": "public, max-age=0, must-revalidate"}],
+        },
+        {
+            "source": "/js/:path*",
+            "headers": [{"key": "Cache-Control", "value": "public, max-age=0, must-revalidate"}],
+        },
+        {
+            "source": "/index.html",
+            "headers": [{"key": "Cache-Control", "value": "public, max-age=0, must-revalidate"}],
+        },
+    ],
+}
+
+VERCEL_IGNORE = """src
+tools
+supabase
+node_modules
+README.md
+.gitignore
 """
 
 
@@ -163,82 +240,54 @@ def page(head: str, body: str, scripts: list[str], vendor: str = "") -> str:
 """
 
 
-def copy_shared(dest: pathlib.Path, app_script: str, app_src: pathlib.Path) -> None:
-    (dest / "css").mkdir(parents=True, exist_ok=True)
-    (dest / "js").mkdir(parents=True, exist_ok=True)
-    (dest / "images").mkdir(parents=True, exist_ok=True)
-
-    shutil.copy2(SRC / "shared" / "styles.css", dest / "css" / "styles.css")
-    shutil.copy2(SRC / "shared" / "config.js", dest / "js" / "config.js")
-    shutil.copy2(SRC / "shared" / "settings.js", dest / "js" / "settings.js")
-    shutil.copy2(SRC / "shared" / "storage.js", dest / "js" / "storage.js")
-    shutil.copy2(SRC / "shared" / "common.js", dest / "js" / "common.js")
-    shutil.copy2(app_src, dest / "js" / app_script)
-    for img in (SRC / "shared" / "images").iterdir():
-        shutil.copy2(img, dest / "images" / img.name)
-
-
 def main() -> None:
-    # ---------------- A. public site ----------------
-    pub = ROOT / "public-site"
-    for sub in ("css", "js", "images"):
-        shutil.rmtree(pub / sub, ignore_errors=True)
-    copy_shared(pub, "app.js", SRC / "public" / "app.js")
+    vendor = SUPABASE_CDN if supabase_configured() else ""
 
+    # ---------------- shared assets, once ----------------
+    for sub in ("css", "js", "images"):
+        shutil.rmtree(ROOT / sub, ignore_errors=True)
+        (ROOT / sub).mkdir(parents=True, exist_ok=True)
+
+    shutil.copy2(SRC / "shared" / "styles.css", ROOT / "css" / "styles.css")
+    for name in ("config.js", "settings.js", "storage.js", "common.js"):
+        shutil.copy2(SRC / "shared" / name, ROOT / "js" / name)
+    shutil.copy2(SRC / "public" / "app.js", ROOT / "js" / "app.js")
+    shutil.copy2(SRC / "admin" / "admin.js", ROOT / "js" / "admin.js")
+    for img in (SRC / "shared" / "images").iterdir():
+        shutil.copy2(img, ROOT / "images" / img.name)
+
+    # ---------------- index.html (public) ----------------
     body = (SRC / "public" / "body.html").read_text(encoding="utf-8").strip()
-    (pub / "index.html").write_text(
-        page(PUBLIC_HEAD, body,
-             ["config.js", "settings.js", "storage.js", "common.js", "app.js"],
-             vendor=SUPABASE_CDN if supabase_configured() else ""),
+    (ROOT / "index.html").write_text(
+        page(PUBLIC_HEAD, body, ["config.js", "settings.js", "storage.js", "common.js", "app.js"], vendor),
         encoding="utf-8",
     )
-    (pub / "robots.txt").write_text("User-agent: *\nAllow: /\n", encoding="utf-8")
-    (pub / "404.html").write_text(PUBLIC_404, encoding="utf-8")
 
-    # ---------------- B. admin panel ----------------
-    adm = ROOT / "admin-panel"
-    for sub in ("css", "js", "images"):
-        shutil.rmtree(adm / sub, ignore_errors=True)
-    copy_shared(adm, "admin.js", SRC / "admin" / "admin.js")
-
+    # ---------------- admin.html ----------------
     section = (SRC / "admin" / "section.html").read_text(encoding="utf-8").strip()
     # Standalone page: there is no tab router here, so the section must start visible.
     section = section.replace('<section id="admin">', '<section id="admin" class="active">', 1)
     footer = (SRC / "shared" / "footer.html").read_text(encoding="utf-8").strip()
-    (adm / "index.html").write_text(
+    (ROOT / "admin.html").write_text(
         page(ADMIN_HEAD, f"{ADMIN_NAV}\n\n{section}\n\n{footer}",
-             ["config.js", "settings.js", "storage.js", "common.js", "admin.js"],
-             vendor=SUPABASE_CDN if supabase_configured() else ""),
+             ["config.js", "settings.js", "storage.js", "common.js", "admin.js"], vendor),
         encoding="utf-8",
     )
-    (adm / "robots.txt").write_text(
-        "# Admin panel — must never be indexed.\nUser-agent: *\nDisallow: /\n", encoding="utf-8"
-    )
-    (adm / "404.html").write_text(ADMIN_404, encoding="utf-8")
 
-    # ---------------- root fallback ----------------
-    # If someone imports this repo into Vercel WITHOUT setting the Root
-    # Directory, Vercel builds from the repo root. With a package.json present
-    # and no vercel.json there, it then hunts for an output folder named
-    # "public", does not find one, and fails the deploy. This file removes that
-    # trap: a root-level import now serves the public site.
-    #
-    # Generated from public-site/vercel.json so the headers cannot drift.
-    root_cfg = json.loads((pub / "vercel.json").read_text(encoding="utf-8"))
-    root_cfg["buildCommand"] = 'echo "Static site — public-site/ is already built and committed."'
-    root_cfg["installCommand"] = 'echo "No dependencies."'
-    root_cfg["outputDirectory"] = "public-site"
-    (ROOT / "vercel.json").write_text(json.dumps(root_cfg, indent=2) + "\n", encoding="utf-8")
-    print('vercel.json (root fallback -> serves public-site/)\n')
+    # ---------------- static extras ----------------
+    (ROOT / "404.html").write_text(NOT_FOUND, encoding="utf-8")
+    (ROOT / "robots.txt").write_text(ROBOTS, encoding="utf-8")
+    (ROOT / "vercel.json").write_text(json.dumps(VERCEL_JSON, indent=2) + "\n", encoding="utf-8")
+    (ROOT / ".vercelignore").write_text(VERCEL_IGNORE, encoding="utf-8")
 
     # ---------------- report ----------------
-    for name, d in (("public-site", pub), ("admin-panel", adm)):
-        files = sorted(p for p in d.rglob("*") if p.is_file())
-        total = sum(p.stat().st_size for p in files)
-        print(f"{name}/  ({len(files)} files, {total:,} bytes)")
-        for p in files:
-            print(f"   {p.relative_to(d)}  ({p.stat().st_size:,})")
-        print()
+    deployed = ["index.html", "admin.html", "404.html", "robots.txt", "vercel.json"]
+    files = [ROOT / f for f in deployed]
+    files += sorted(p for sub in ("css", "js", "images") for p in (ROOT / sub).rglob("*") if p.is_file())
+    total = sum(p.stat().st_size for p in files)
+    print(f"single deployment at repo root  ({len(files)} files, {total:,} bytes)")
+    for p in files:
+        print(f"   {p.relative_to(ROOT)}  ({p.stat().st_size:,})")
 
 
 if __name__ == "__main__":

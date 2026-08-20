@@ -25,6 +25,7 @@
   <a href="/" class="btn btn-primary" style="text-decoration:none;">
     <span class="bn">হোমে ফিরে যাও</span><span class="en">Back to home</span>
   </a>
+  <button class="lang-toggle" style="margin-top:26px;" onclick="document.body.classList.toggle('lang-bn');document.body.classList.toggle('lang-en');">EN / বাং</button>
 </main>
 <footer>
   <div class="wrap">
@@ -32,9 +33,5 @@
     <span class="en">Uttarbanga Heritage Fest © 2026</span>
   </div>
 </footer>
-<script>
-  document.querySelector('a.btn').insertAdjacentHTML('afterend',
-    '<button class="lang-toggle" style="margin-top:26px;" onclick="document.body.classList.toggle(\'lang-bn\');document.body.classList.toggle(\'lang-en\');">EN / বাং</button>');
-</script>
 </body>
 </html>

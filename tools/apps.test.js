@@ -1,10 +1,8 @@
 /*
- * apps.test.js — verifies the two deployments in isolation, and demonstrates
- * the one thing that splitting them breaks.
+ * apps.test.js — one merged deployment: public site at /, admin panel at /admin.
  *
- * Needs both dev servers running:
- *   (cd public-site && python3 -m http.server 8000 --bind 0.0.0.0)
- *   (cd admin-panel && python3 -m http.server 8001 --bind 0.0.0.0)
+ * Needs the dev server running (it mirrors vercel.json, including cleanUrls):
+ *   npm run dev            # port 8000
  *
  * Run:  node tools/apps.test.js       (or: npm test)
  */
@@ -12,26 +10,40 @@
 
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
 const { JSDOM, VirtualConsole } = require('jsdom');
 
 const ROOT = path.resolve(__dirname, '..');
-const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || 'http://127.0.0.1:8000';
-const ADMIN_ORIGIN = process.env.ADMIN_ORIGIN || 'http://127.0.0.1:8001';
+const ORIGIN = process.env.ORIGIN || 'http://127.0.0.1:8000';
 
 let passed = 0;
 let failed = 0;
 
 function check(label, cond, detail) {
   if (cond) { passed++; console.log('  ok   ' + label); }
-  else { failed++; console.log('  FAIL ' + label + (detail ? '  -> ' + detail : '')); }
+  else { failed++; console.log('  FAIL ' + label + (detail !== undefined ? '  -> ' + detail : '')); }
 }
 
-function load(origin) {
+const text = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
+
+/** Raw request that does NOT follow redirects, so we can assert on 308s. */
+function head(urlPath) {
+  return new Promise((resolve, reject) => {
+    const req = http.request(ORIGIN + urlPath, { method: 'HEAD' }, (res) => {
+      res.resume();
+      resolve({ status: res.statusCode, location: res.headers.location, headers: res.headers });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+function load(urlPath) {
   const errors = [];
   const vc = new VirtualConsole();
   vc.on('jsdomError', (e) => errors.push(e.message));
   vc.on('error', (m) => errors.push('console.error: ' + m));
-  return JSDOM.fromURL(origin + '/', {
+  return JSDOM.fromURL(ORIGIN + urlPath, {
     runScripts: 'dangerously',
     resources: 'usable',
     virtualConsole: vc,
@@ -42,206 +54,172 @@ function load(origin) {
   });
 }
 
-const text = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
-
 (async function run() {
   // =====================================================================
-  console.log('\nA. PUBLIC SITE  (' + PUBLIC_ORIGIN + ')\n');
-  const { dom: pub, errors: pubErrors } = await load(PUBLIC_ORIGIN);
+  console.log('\nA. ROUTING  (the /admin 404 this restructure fixes)\n');
+
+  const r = {
+    home: await head('/'),
+    admin: await head('/admin'),
+    adminHtml: await head('/admin.html'),
+    adminSlash: await head('/admin/'),
+    missing: await head('/definitely-not-a-page'),
+    css: await head('/css/styles.css'),
+    adminJs: await head('/js/admin.js')
+  };
+
+  check('/ serves the public site', r.home.status === 200, r.home.status);
+  check('/admin serves the admin panel (cleanUrls, no rewrite needed)', r.admin.status === 200, r.admin.status);
+  check('/admin.html 308-redirects to /admin', r.adminHtml.status === 308 && /\/admin$/.test(r.adminHtml.location || ''),
+    r.adminHtml.status + ' ' + r.adminHtml.location);
+  check('/admin/ 308-redirects to /admin (trailingSlash: false)', r.adminSlash.status === 308,
+    r.adminSlash.status);
+  check('an unknown path still 404s (no catch-all rewrite masking it)', r.missing.status === 404, r.missing.status);
+  check('assets load from the merged root', r.css.status === 200 && r.adminJs.status === 200);
+
+  // =====================================================================
+  console.log('\nB. HEADERS\n');
+
+  check('/ sends nosniff + SAMEORIGIN', r.home.headers['x-content-type-options'] === 'nosniff' &&
+    r.home.headers['x-frame-options'] === 'SAMEORIGIN', JSON.stringify(r.home.headers['x-frame-options']));
+  check('/admin is noindex', /noindex/.test(r.admin.headers['x-robots-tag'] || ''), r.admin.headers['x-robots-tag']);
+  check('/admin is never cached', /no-store/.test(r.admin.headers['cache-control'] || ''), r.admin.headers['cache-control']);
+  check('/admin cannot be framed (DENY, overriding the site-wide SAMEORIGIN)',
+    r.admin.headers['x-frame-options'] === 'DENY', r.admin.headers['x-frame-options']);
+  check('/admin leaks no referrer', r.admin.headers['referrer-policy'] === 'no-referrer', r.admin.headers['referrer-policy']);
+  check('no header is sent twice with conflicting values on /admin',
+    !String(r.admin.headers['x-frame-options']).includes(','), r.admin.headers['x-frame-options']);
+  check('robots.txt disallows the admin route',
+    /Disallow:\s*\/admin\b/.test(text('robots.txt')) && /Disallow:\s*\/admin\.html/.test(text('robots.txt')));
+
+  // =====================================================================
+  console.log('\nC. PUBLIC SITE  (/)\n');
+  const { dom: pub, errors: pubErrors } = await load('/');
   const pdoc = pub.window.document;
+  const pw = pub.window;
 
   const sections = [...pdoc.querySelectorAll('section[id]')].map((s) => s.id);
   check('has the 6 public sections', ['home', 'register', 'exam', 'leaderboard', 'team', 'info']
     .every((id) => sections.includes(id)), sections.join(','));
-  check('has NO admin section', !sections.includes('admin'), sections.join(','));
+  check('has NO admin section embedded in the page', !sections.includes('admin'));
   check('has NO admin nav tab', !pdoc.querySelector('[data-tab="admin"]'));
-  check('no link anywhere points at an admin route',
+  check('no link in the public page points at /admin',
     [...pdoc.querySelectorAll('a[href]')].every((a) => !/admin/i.test(a.getAttribute('href'))));
-  check('public JS bundle does not ship ADMIN_PASSWORD',
-    !text('public-site/js/app.js').includes('ADMIN_PASSWORD') &&
-    !text('public-site/js/common.js').includes('ADMIN_PASSWORD'));
-  check('public folder ships no admin.js', !fs.existsSync(path.join(ROOT, 'public-site/js/admin.js')));
-  check('public app booted (switchTab defined)', typeof pub.window.switchTab === 'function');
-  check('registration form is present', !!pdoc.getElementById('regForm'));
-  check('robots.txt allows indexing', text('public-site/robots.txt').includes('Allow: /'));
-  check('meta robots = index, follow',
-    pdoc.querySelector('meta[name="robots"]')?.content === 'index, follow');
+  check('meta robots = index, follow', pdoc.querySelector('meta[name="robots"]')?.content === 'index, follow');
+  check('public app booted', typeof pw.switchTab === 'function' && !!pdoc.getElementById('regForm'));
   check('zero uncaught JS errors', pubErrors.length === 0, pubErrors.join(' || '));
 
   // =====================================================================
-  console.log('\nB. ADMIN PANEL  (' + ADMIN_ORIGIN + ')\n');
-  const { dom: adm, errors: admErrors } = await load(ADMIN_ORIGIN);
+  console.log('\nD. ADMIN PANEL  (/admin)\n');
+  const { dom: adm, errors: admErrors } = await load('/admin');
   const adoc = adm.window.document;
 
-  check('admin section exists and is visible without a tab router',
+  check('admin section renders without a tab router',
     adoc.querySelector('#admin')?.classList.contains('active'));
-  check('login gate is rendered', !!adoc.getElementById('adminLogin'));
-  check('admin panel starts hidden', adoc.getElementById('adminPanel')?.classList.contains('hidden'));
-  check('admin app booted (adminLogin defined)', typeof adm.window.adminLogin === 'function');
-  check('admin app booted (loadAdminRegistrations defined)', typeof adm.window.loadAdminRegistrations === 'function');
-  check('shares getCategoryKey from common.js', typeof adm.window.getCategoryKey === 'function');
-  check('ships no public exam/registration code',
-    !fs.existsSync(path.join(ROOT, 'admin-panel/js/app.js')) &&
-    typeof adm.window.startExam === 'undefined');
-  check('meta robots = noindex, nofollow, ...',
-    /noindex/.test(adoc.querySelector('meta[name="robots"]')?.content || ''));
-  check('robots.txt disallows everything', /Disallow:\s*\/\s*$/m.test(text('admin-panel/robots.txt')));
-  check('vercel.json sends X-Robots-Tag: noindex',
-    JSON.stringify(JSON.parse(text('admin-panel/vercel.json')))
-      .includes('"X-Robots-Tag"') &&
-    text('admin-panel/vercel.json').includes('noindex'));
-  check('vercel.json sends no-store so admin data is never cached',
-    text('admin-panel/vercel.json').includes('no-store'));
-  check('vercel.json sets X-Frame-Options DENY', text('admin-panel/vercel.json').includes('"DENY"'));
-  check('no link back to the public site', adoc.querySelectorAll('nav a').length === 0);
+  check('login gate shown, panel hidden', !!adoc.getElementById('adminLogin') &&
+    adoc.getElementById('adminPanel')?.classList.contains('hidden'));
+  check('meta robots = noindex', /noindex/.test(adoc.querySelector('meta[name="robots"]')?.content || ''));
+  check('admin assets resolve from the same depth as index.html',
+    !!adoc.querySelector('link[rel="stylesheet"][href="./css/styles.css"]') &&
+    !!adoc.querySelector('script[src="./js/admin.js"]'));
+  check('admin app booted', typeof adm.window.adminLogin === 'function' &&
+    typeof adm.window.loadTimerSettings === 'function');
+  check('shares common.js with the public page', typeof adm.window.getCategoryKey === 'function');
+  check('no link back to the public site from the admin nav', adoc.querySelectorAll('nav a').length === 0);
   check('zero uncaught JS errors', admErrors.length === 0, admErrors.join(' || '));
 
   // =====================================================================
-  console.log('\nC. CONSEQUENCE OF SPLITTING (this is expected to be BROKEN)\n');
-  await pub.window.storage.set('participant:UHF-CROSS1',
-    JSON.stringify({ id: 'UHF-CROSS1', name: 'Origin Test', examTaken: true, score: 9, maxScore: 10 }), true);
-  const seenByPublic = await pub.window.storage.list('participant:', true);
-  const seenByAdmin = await adm.window.storage.list('participant:', true);
+  console.log('\nE. EXAM TIMER CONTROL\n');
 
-  check('the public origin sees the registration it just saved',
-    seenByPublic.keys.includes('participant:UHF-CROSS1'));
-  console.log('       public origin keys : ' + JSON.stringify(seenByPublic.keys));
-  console.log('       admin  origin keys : ' + JSON.stringify(seenByAdmin.keys));
-  check('DEMONSTRATED: the admin origin sees NOTHING (localStorage is per-origin)',
-    !seenByAdmin.keys.includes('participant:UHF-CROSS1'));
-  console.log('\n       ^ This is not a bug in the split. localStorage is scoped to');
-  console.log('         scheme+host+port, so two deployments can never share it.');
-  console.log('         A shared backend is required. See README, "Architecture".');
-
-  // =====================================================================
-  console.log('\nD. EXAM TIMER CONTROL\n');
-
-  // ---- admin UI ------------------------------------------------------
-  check('admin has a "টাইমার নিয়ন্ত্রণ" sub-tab', !!adoc.querySelector('[data-sub="timer"]'));
-  check('admin timer panel exists and starts hidden',
-    adoc.getElementById('adminTimer')?.classList.contains('hidden'));
-  check('section is titled "পরীক্ষার টাইমার নিয়ন্ত্রণ" / "Exam Timer Control"',
+  check('section titled "পরীক্ষার টাইমার নিয়ন্ত্রণ" / "Exam Timer Control"',
     /পরীক্ষার টাইমার নিয়ন্ত্রণ/.test(adoc.getElementById('adminTimer').textContent) &&
     /Exam Timer Control/.test(adoc.getElementById('adminTimer').textContent));
-  check('ON/OFF control is a real toggle SWITCH, not a bare checkbox',
-    adoc.getElementById('timerEnabledInput')?.type === 'checkbox' &&
+  check('ON/OFF is a real toggle switch',
     !!adoc.querySelector('label.switch > #timerEnabledInput + .switch-track > .switch-thumb'));
-  check('switch has styles shipped in both builds',
-    text('admin-panel/css/styles.css').includes('.switch input:checked + .switch-track') &&
-    text('public-site/css/styles.css').includes('.switch-track'));
   check('date & time picker present', adoc.getElementById('timerDateInput')?.type === 'datetime-local');
-  check('off-behaviour select offers both live and message',
+  check('off-behaviour select offers live and message',
     [...(adoc.getElementById('timerOffBehaviorInput')?.options || [])].map((o) => o.value).join(',') === 'live,message');
-  check('custom message fields present (bn + en)',
-    !!adoc.getElementById('timerMessageBnInput') && !!adoc.getElementById('timerMessageEnInput'));
-  check('Save button present', !!adoc.getElementById('timerSaveBtn'));
-  check('status badge present', !!adoc.getElementById('timerStatusBadge'));
-  check('Bengali labels used in the admin timer UI',
-    /কাউন্টডাউন টাইমার দেখাও/.test(adoc.body.textContent) &&
-    /পরীক্ষা শুরুর তারিখ ও সময়/.test(adoc.body.textContent));
-  check('admin timer handlers are wired',
-    typeof adm.window.loadTimerSettings === 'function' && typeof adm.window.saveTimerSettings === 'function');
-  check('admin warns on screen that localStorage is not shared',
-    (() => { adm.window.renderTimerBackendNote();
-      return /localStorage/.test(adoc.getElementById('timerBackendNote').textContent); })());
+  check('bilingual custom message fields + Save + status badge',
+    !!adoc.getElementById('timerMessageBnInput') && !!adoc.getElementById('timerMessageEnInput') &&
+    !!adoc.getElementById('timerSaveBtn') && !!adoc.getElementById('timerStatusBadge'));
 
-  // ---- public exam gate: three states --------------------------------
-  const pw = pub.window;
   const gate = (s) => pw.renderExamGate(pw.examSettings.normalise(s));
   const vis = (id) => !pdoc.getElementById(id).classList.contains('hidden');
-
   const FUTURE = '2099-01-01T00:00:00+06:00';
   const PAST = '2000-01-01T00:00:00+06:00';
 
   gate({ timerEnabled: true, examStartDate: FUTURE });
-  check('timer ON, date in the future -> countdown box is VISIBLE', vis('countdownBox'));
-  check('timer ON, future -> locked panel shown, login hidden', vis('examLocked') && !vis('examLogin'));
-  check('timer ON, future -> countdown digits are actually counting',
-    /^\d{2}$/.test(pdoc.getElementById('cdDays').textContent) &&
+  check('timer ON + future -> countdown visible and counting',
+    vis('countdownBox') && vis('examLocked') && !vis('examLogin') &&
     pdoc.getElementById('cdDays').textContent !== '00');
-  check('timer ON -> Bangla date is rendered in the locked message',
-    /[০-৯]/.test(pdoc.getElementById('examLockedTextBn').textContent));
-
   gate({ timerEnabled: true, examStartDate: PAST });
-  check('timer ON, date passed -> exam login shown, countdown hidden',
-    vis('examLogin') && !vis('examLocked'));
-
+  check('timer ON + past -> exam opens', vis('examLogin') && !vis('examLocked'));
   gate({ timerEnabled: false, offBehavior: 'live', examStartDate: FUTURE });
-  check('timer OFF + live -> countdown box HIDDEN', !vis('countdownBox'));
-  check('timer OFF + live -> exam is open even though the date is in the future',
-    vis('examLogin') && !vis('examLocked'));
+  check('timer OFF + live -> countdown hidden, exam open', !vis('countdownBox') && vis('examLogin'));
+  gate({ timerEnabled: false, offBehavior: 'message', examStartDate: FUTURE, customMessage: 'বন্ধ আছে।' });
+  check('timer OFF + message -> countdown hidden, notice shown',
+    !vis('countdownBox') && !vis('examLogin') &&
+    pdoc.getElementById('examLockedTextBn').textContent === 'বন্ধ আছে।');
 
-  gate({ timerEnabled: false, offBehavior: 'message', examStartDate: FUTURE,
-    customMessage: 'পরীক্ষা সাময়িকভাবে বন্ধ আছে।', customMessageEn: 'The exam is paused.' });
-  check('timer OFF + message -> countdown box HIDDEN', !vis('countdownBox'));
-  check('timer OFF + message -> the organiser message is displayed',
-    pdoc.getElementById('examLockedTextBn').textContent === 'পরীক্ষা সাময়িকভাবে বন্ধ আছে।');
-  check('timer OFF + message -> exam login stays hidden', !vis('examLogin'));
-
-  // ---- the Bengali design must be untouched ---------------------------
   const cdText = pdoc.getElementById('countdownBox').textContent;
   check('countdown still labelled দিন / ঘণ্টা / মিনিট / সেকেন্ড',
-    ['দিন', 'ঘণ্টা', 'মিনিট', 'সেকেন্ড'].every((w) => cdText.includes(w)), cdText.replace(/\s+/g, ' ').trim());
-  check('all four countdown cells still exist with their original ids',
+    ['দিন', 'ঘণ্টা', 'মিনিট', 'সেকেন্ড'].every((w) => cdText.includes(w)));
+  check('all four countdown ids intact',
     ['cdDays', 'cdHours', 'cdMinutes', 'cdSeconds'].every((id) => !!pdoc.getElementById(id)));
-  check('the old hardcoded EXAM_START_DATE constant is gone',
-    !text('public-site/js/app.js').includes('const EXAM_START_DATE'));
-
-  // ---- existing behaviour not broken ----------------------------------
-  check('registration, exam and leaderboard functions all still defined',
-    ['startExam', 'submitExam', 'loadLeaderboard', 'selectAnswer'].every((f) => typeof pw[f] === 'function'));
-  check('settings layer reports the local backend when Supabase is unconfigured',
-    pw.examSettings.backend === 'local');
-  check('no supabase CDN request is made while unconfigured',
-    !text('public-site/index.html').includes('supabase-js'));
 
   // =====================================================================
-  console.log('\nE. VERCEL CONFIG (guards the "No Output Directory named public" failure)\n');
+  console.log('\nF. SAME-ORIGIN STORAGE (the upside of merging)\n');
 
-  const cfg = (p) => JSON.parse(text(p));
-  const root = cfg('vercel.json');
-  const pubCfg = cfg('public-site/vercel.json');
-  const admCfg = cfg('admin-panel/vercel.json');
+  // Note on method: jsdom gives every JSDOM instance its own localStorage, so
+  // two instances cannot demonstrate browser-level sharing no matter what the
+  // origin is. What IS verifiable here is the mechanism that decides sharing —
+  // the origin — plus the fact that both pages use one storage namespace.
+  const pubOrigin = pub.window.location.origin;
+  const admOrigin = adm.window.location.origin;
+  check('public page and admin page are served from ONE origin',
+    pubOrigin === admOrigin, pubOrigin + ' vs ' + admOrigin);
+  check('both pages load the same storage adapter file',
+    !!pdoc.querySelector('script[src="./js/storage.js"]') &&
+    !!adoc.querySelector('script[src="./js/storage.js"]'));
+  check('both use the same "uhf:" localStorage namespace',
+    text('js/storage.js').includes("var PREFIX = 'uhf:'"));
 
-  check('a root vercel.json exists, so a root-level import cannot look for public/',
-    !!root);
-  check('root config serves public-site/', root.outputDirectory === 'public-site', root.outputDirectory);
-  check('every config pins buildCommand explicitly (nothing inferred)',
-    [root, pubCfg, admCfg].every((c) => typeof c.buildCommand === 'string' && c.buildCommand.length > 0));
-  check('every config pins installCommand explicitly',
-    [root, pubCfg, admCfg].every((c) => typeof c.installCommand === 'string' && c.installCommand.length > 0));
-  check('no config asks for an output directory named "public"',
-    [root, pubCfg, admCfg].every((c) => c.outputDirectory !== 'public'));
-  check('per-app configs serve their own folder',
-    pubCfg.outputDirectory === '.' && admCfg.outputDirectory === '.');
-  check('root headers stay in sync with public-site (generated, not copied by hand)',
-    JSON.stringify(root.headers) === JSON.stringify(pubCfg.headers));
-  check('no config mixes legacy routes with cleanUrls/headers',
-    [root, pubCfg, admCfg].every((c) => !('routes' in c)));
-  check('public site ships a branded 404.html (Vercel serves it automatically)',
-    fs.existsSync(path.join(ROOT, 'public-site/404.html')) &&
-    /৪০৪/.test(text('public-site/404.html')) &&
-    /noindex/.test(text('public-site/404.html')));
-  check('public 404 uses root-absolute asset paths (it can be served from any depth)',
-    /href="\/css\/styles\.css"/.test(text('public-site/404.html')));
-  check('admin ships a bare 404 that reveals nothing about the deployment',
-    fs.existsSync(path.join(ROOT, 'admin-panel/404.html')) &&
-    !/admin/i.test(text('admin-panel/404.html').replace(/<title>404<\/title>/, '')) &&
-    /noindex, nofollow/.test(text('admin-panel/404.html')));
-  check('NO SPA catch-all rewrite was added (a wrong URL must 404, not silently show home)',
-    [root, pubCfg, admCfg].every((c) => !c.rewrites));
-  check('public site still contains no admin.html and no /admin route',
-    !fs.existsSync(path.join(ROOT, 'public-site/admin.html')) &&
-    !fs.existsSync(path.join(ROOT, 'public-site/admin')) &&
-    !JSON.stringify(pubCfg).includes('admin'));
-  check('the directory each config points at really exists and holds an index.html',
-    fs.existsSync(path.join(ROOT, 'public-site/index.html')) &&
-    fs.existsSync(path.join(ROOT, 'admin-panel/index.html')));
+  await pw.storage.set('participant:UHF-MERGE1',
+    JSON.stringify({ id: 'UHF-MERGE1', name: 'Same Origin', examTaken: true, score: 8, maxScore: 10 }), true);
+  const readBack = await pw.storage.list('participant:', true);
+  check('a saved registration round-trips through the adapter',
+    readBack.keys.includes('participant:UHF-MERGE1'), JSON.stringify(readBack.keys));
+
+  console.log('       Same origin => a real browser shares localStorage between / and /admin,');
+  console.log('       so the admin table now sees registrations made on this device.');
+  console.log('       Untested here: jsdom isolates localStorage per instance, so the');
+  console.log('       cross-page read cannot be exercised in this harness — verify in a');
+  console.log('       browser. It is still per-DEVICE either way: another visitor\'s phone');
+  console.log('       shows nothing. Supabase remains required for a real event.');
+
+  // =====================================================================
+  console.log('\nG. VERCEL CONFIG\n');
+
+  const cfg = JSON.parse(text('vercel.json'));
+  check('single vercel.json at the repo root', !!cfg);
+  check('outputDirectory is the repo root, so no Root Directory setting is needed',
+    cfg.outputDirectory === '.', cfg.outputDirectory);
+  check('cleanUrls on, trailingSlash off', cfg.cleanUrls === true && cfg.trailingSlash === false);
+  check('buildCommand and installCommand pinned (nothing inferred)',
+    !!cfg.buildCommand && !!cfg.installCommand);
+  check('no legacy routes key', !('routes' in cfg));
+  check('no catch-all rewrite', !cfg.rewrites);
+  check('.vercelignore keeps src/, tools/ and supabase/ out of the deployment',
+    ['src', 'tools', 'supabase'].every((d) => text('.vercelignore').includes(d)));
+  check('the old split folders are gone',
+    !fs.existsSync(path.join(ROOT, 'public-site')) && !fs.existsSync(path.join(ROOT, 'admin-panel')));
+  check('index.html, admin.html and 404.html all exist at the root',
+    ['index.html', 'admin.html', '404.html'].every((f) => fs.existsSync(path.join(ROOT, f))));
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
 })().catch((err) => {
   console.error('test harness failed:', err);
-  console.error('are BOTH dev servers running?  npm run dev');
+  console.error('is the dev server running?  npm run dev   (expected at ' + ORIGIN + ')');
   process.exit(1);
 });

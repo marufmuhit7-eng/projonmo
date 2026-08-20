@@ -1,8 +1,8 @@
 {
   "name": "projonmo-heritage-fest",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
-  "description": "Uttarbanga Heritage Fest — monorepo. src/ is the source of truth; tools/build.py generates two independent Vercel deployments: public-site/ and admin-panel/.",
+  "description": "Uttarbanga Heritage Fest — single Vercel deployment. src/ is the source of truth; tools/build.py generates index.html, admin.html and assets into the repo root.",
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
@@ -10,13 +10,11 @@
   },
   "scripts": {
     "build": "python3 tools/build.py",
-    "dev": "npm run dev:public & npm run dev:admin & wait",
-    "dev:public": "cd public-site && python3 -m http.server 8000 --bind 0.0.0.0",
-    "dev:admin": "cd admin-panel && python3 -m http.server 8001 --bind 0.0.0.0",
+    "dev": "python3 tools/serve.py",
     "test": "node tools/storage.test.js && node tools/settings.test.js && node tools/apps.test.js",
     "test:storage": "node tools/storage.test.js",
-    "test:apps": "node tools/apps.test.js",
-    "test:settings": "node tools/settings.test.js"
+    "test:settings": "node tools/settings.test.js",
+    "test:apps": "node tools/apps.test.js"
   },
   "keywords": [
     "static-site",
