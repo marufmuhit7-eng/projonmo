@@ -14,6 +14,7 @@ Run:  python3 tools/build.py     (or: npm run build)
 """
 from __future__ import annotations
 
+import json
 import pathlib
 import re
 import shutil
@@ -152,6 +153,21 @@ def main() -> None:
     (adm / "robots.txt").write_text(
         "# Admin panel — must never be indexed.\nUser-agent: *\nDisallow: /\n", encoding="utf-8"
     )
+
+    # ---------------- root fallback ----------------
+    # If someone imports this repo into Vercel WITHOUT setting the Root
+    # Directory, Vercel builds from the repo root. With a package.json present
+    # and no vercel.json there, it then hunts for an output folder named
+    # "public", does not find one, and fails the deploy. This file removes that
+    # trap: a root-level import now serves the public site.
+    #
+    # Generated from public-site/vercel.json so the headers cannot drift.
+    root_cfg = json.loads((pub / "vercel.json").read_text(encoding="utf-8"))
+    root_cfg["buildCommand"] = 'echo "Static site — public-site/ is already built and committed."'
+    root_cfg["installCommand"] = 'echo "No dependencies."'
+    root_cfg["outputDirectory"] = "public-site"
+    (ROOT / "vercel.json").write_text(json.dumps(root_cfg, indent=2) + "\n", encoding="utf-8")
+    print('vercel.json (root fallback -> serves public-site/)\n')
 
     # ---------------- report ----------------
     for name, d in (("public-site", pub), ("admin-panel", adm)):

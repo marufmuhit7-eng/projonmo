@@ -195,6 +195,33 @@ const text = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
   check('no supabase CDN request is made while unconfigured',
     !text('public-site/index.html').includes('supabase-js'));
 
+  // =====================================================================
+  console.log('\nE. VERCEL CONFIG (guards the "No Output Directory named public" failure)\n');
+
+  const cfg = (p) => JSON.parse(text(p));
+  const root = cfg('vercel.json');
+  const pubCfg = cfg('public-site/vercel.json');
+  const admCfg = cfg('admin-panel/vercel.json');
+
+  check('a root vercel.json exists, so a root-level import cannot look for public/',
+    !!root);
+  check('root config serves public-site/', root.outputDirectory === 'public-site', root.outputDirectory);
+  check('every config pins buildCommand explicitly (nothing inferred)',
+    [root, pubCfg, admCfg].every((c) => typeof c.buildCommand === 'string' && c.buildCommand.length > 0));
+  check('every config pins installCommand explicitly',
+    [root, pubCfg, admCfg].every((c) => typeof c.installCommand === 'string' && c.installCommand.length > 0));
+  check('no config asks for an output directory named "public"',
+    [root, pubCfg, admCfg].every((c) => c.outputDirectory !== 'public'));
+  check('per-app configs serve their own folder',
+    pubCfg.outputDirectory === '.' && admCfg.outputDirectory === '.');
+  check('root headers stay in sync with public-site (generated, not copied by hand)',
+    JSON.stringify(root.headers) === JSON.stringify(pubCfg.headers));
+  check('no config mixes legacy routes with cleanUrls/headers',
+    [root, pubCfg, admCfg].every((c) => !('routes' in c)));
+  check('the directory each config points at really exists and holds an index.html',
+    fs.existsSync(path.join(ROOT, 'public-site/index.html')) &&
+    fs.existsSync(path.join(ROOT, 'admin-panel/index.html')));
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
 })().catch((err) => {
