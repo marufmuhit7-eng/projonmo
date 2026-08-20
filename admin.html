@@ -32,14 +32,29 @@
     <h2 style="margin-top:0;"><span class="bn">এডমিন</span><span class="en">Admin</span></h2>
 
     <div id="adminLogin" class="form-box">
-      <p class="bn" style="margin-top:0;color:rgba(36,28,21,0.75);">এই অংশ শুধুমাত্র আয়োজক টিমের জন্য। পাসওয়ার্ড দিয়ে লগইন করো।</p>
-      <p class="en" style="margin-top:0;color:rgba(36,28,21,0.75);">This section is for organizers only. Log in with the admin password.</p>
-      <label><span class="bn">পাসওয়ার্ড</span><span class="en">Password</span></label>
-      <input type="text" id="adminPassInput" placeholder="••••••••" style="font-family:var(--f-mono);">
-      <button class="btn btn-primary" style="margin-top:16px;" onclick="adminLogin()"><span class="bn">লগইন</span><span class="en">Log In</span></button>
+      <h3 style="margin-top:0;"><span class="bn">অ্যাডমিন লগইন</span><span class="en">Admin Login</span></h3>
+      <p class="bn" style="margin-top:0;color:rgba(36,28,21,0.75);">এই অংশ শুধুমাত্র আয়োজক টিমের জন্য। ইউজারনেম ও পাসওয়ার্ড দিয়ে লগইন করো।</p>
+      <p class="en" style="margin-top:0;color:rgba(36,28,21,0.75);">This section is for organisers only. Sign in with your username and password.</p>
+
+      <form id="adminLoginForm" autocomplete="off">
+        <label for="adminUserInput"><span class="bn">ইউজারনেম</span><span class="en">Username</span></label>
+        <input type="text" id="adminUserInput" name="username" placeholder="admin" autocomplete="username" style="font-family:var(--f-mono);">
+
+        <label for="adminPassInput" style="margin-top:14px;"><span class="bn">পাসওয়ার্ড</span><span class="en">Password</span></label>
+        <div style="display:flex;gap:8px;align-items:stretch;">
+          <input type="password" id="adminPassInput" name="password" placeholder="••••••••" autocomplete="current-password" style="font-family:var(--f-mono);flex:1;min-width:0;">
+          <button type="button" class="btn btn-ghost" id="adminPassToggle" onclick="toggleAdminPassword()" style="white-space:nowrap;padding:0 14px;">
+            <span class="bn">দেখাও</span><span class="en">Show</span>
+          </button>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="margin-top:18px;"><span class="bn">লগইন</span><span class="en">Log In</span></button>
+      </form>
+
       <div id="adminLoginMsg"></div>
-      <p class="small-note bn">⚠️ এটি একটি স্ট্যাটিক ওয়েবসাইট, তাই এই পাসওয়ার্ড-সুরক্ষা মূলত সাধারণ দর্শকদের ঠেকানোর জন্য — সত্যিকারের নিরাপদ অথেন্টিকেশন নয়। কোডেই পাসওয়ার্ড লেখা থাকে (ADMIN_PASSWORD ভেরিয়েবল), চাইলে বদলে নাও।</p>
-      <p class="small-note en">⚠️ This is a static site, so this password check only keeps out casual visitors — it is not secure authentication. The password lives in the code (ADMIN_PASSWORD variable); change it if you like.</p>
+
+      <p class="small-note bn">⚠️ এটি স্ট্যাটিক সাইট — এই লগইন সাধারণ দর্শকদের ঠেকানোর জন্য, সত্যিকারের নিরাপত্তা নয়। পাসওয়ার্ড হ্যাশ করে রাখা হয়, তবু ব্রাউজারে চলা কোড দিয়ে কাউকে সত্যিই আটকানো যায় না।</p>
+      <p class="small-note en">⚠️ Static site: this login keeps out casual visitors, it is not real security. The password is hashed, but code running in the browser can never truly keep anyone out.</p>
     </div>
 
     <div id="adminPanel" class="hidden">
@@ -48,8 +63,18 @@
           <button class="tab-btn admin-sub-btn active" data-sub="questions" onclick="switchAdminSub('questions')"><span class="bn">প্রশ্ন ম্যানেজমেন্ট</span><span class="en">Questions</span></button>
           <button class="tab-btn admin-sub-btn" data-sub="timer" onclick="switchAdminSub('timer')"><span class="bn">টাইমার নিয়ন্ত্রণ</span><span class="en">Timer</span></button>
           <button class="tab-btn admin-sub-btn" data-sub="regs" onclick="switchAdminSub('regs')"><span class="bn">রেজিস্ট্রেশন তালিকা</span><span class="en">Registrations</span></button>
+          <button class="tab-btn admin-sub-btn" data-sub="password" onclick="switchAdminSub('password')"><span class="bn">পাসওয়ার্ড</span><span class="en">Password</span></button>
         </div>
-        <button class="btn btn-ghost" onclick="adminLogout()"><span class="bn">লগআউট</span><span class="en">Log Out</span></button>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <span id="adminWhoami" class="small-note" style="margin:0;"></span>
+          <button class="btn btn-ghost" onclick="adminLogout()"><span class="bn">লগআউট</span><span class="en">Log Out</span></button>
+        </div>
+      </div>
+
+      <!-- Nag until the shipped default password is replaced -->
+      <div id="adminDefaultPassWarning" class="msg err hidden" style="margin-bottom:20px;">
+        <span class="bn">⚠️ এখনো ডিফল্ট পাসওয়ার্ড (<strong>admin / admin123</strong>) ব্যবহার হচ্ছে। <strong>পাসওয়ার্ড</strong> ট্যাব থেকে এখনই বদলে নাও।</span>
+        <span class="en">⚠️ Still using the default password (<strong>admin / admin123</strong>). Change it now from the <strong>Password</strong> tab.</span>
       </div>
 
       <!-- Question management -->
@@ -133,6 +158,34 @@
         </div>
       </div>
 
+      <!-- ============ Change password ============ -->
+      <div id="adminPassword" class="hidden">
+        <div class="form-box" style="max-width:100%;">
+          <h3 style="margin-top:0;"><span class="bn">পাসওয়ার্ড পরিবর্তন করুন</span><span class="en">Change Password</span></h3>
+          <p class="small-note bn" style="margin-top:0;">নতুন পাসওয়ার্ড এই ব্রাউজারে সংরক্ষিত থাকবে (localStorage), তাই রিলোড করলেও থাকবে। অন্য ডিভাইস বা ব্রাউজারে আলাদা করে বদলাতে হবে।</p>
+          <p class="small-note en" style="margin-top:0;">The new password is stored in this browser (localStorage), so it survives reloads. Other devices and browsers keep their own.</p>
+
+          <form id="adminChangePassForm" autocomplete="off" style="margin-top:18px;">
+            <label for="curPassInput"><span class="bn">বর্তমান পাসওয়ার্ড</span><span class="en">Current password</span></label>
+            <input type="password" id="curPassInput" autocomplete="current-password" style="font-family:var(--f-mono);">
+
+            <label for="newPassInput" style="margin-top:14px;"><span class="bn">নতুন পাসওয়ার্ড</span><span class="en">New password</span></label>
+            <input type="password" id="newPassInput" autocomplete="new-password" style="font-family:var(--f-mono);">
+            <p class="small-note bn" style="margin-top:6px;">কমপক্ষে ৬ অক্ষর।</p>
+            <p class="small-note en" style="margin-top:6px;">At least 6 characters.</p>
+
+            <label for="confirmPassInput" style="margin-top:14px;"><span class="bn">নতুন পাসওয়ার্ড আবার লেখো</span><span class="en">Confirm new password</span></label>
+            <input type="password" id="confirmPassInput" autocomplete="new-password" style="font-family:var(--f-mono);">
+
+            <div style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap;">
+              <button type="submit" class="btn btn-primary" id="changePassBtn"><span class="bn">পাসওয়ার্ড বদলাও</span><span class="en">Change Password</span></button>
+              <button type="button" class="btn btn-ghost" onclick="resetAdminPassword()"><span class="bn">ডিফল্টে ফিরিয়ে নাও</span><span class="en">Reset to default</span></button>
+            </div>
+          </form>
+          <div id="adminPassMsg"></div>
+        </div>
+      </div>
+
       <!-- Registrations viewer -->
       <div id="adminRegs" class="hidden">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
@@ -170,6 +223,7 @@
 <script src="./js/settings.js" defer></script>
 <script src="./js/storage.js" defer></script>
 <script src="./js/common.js" defer></script>
+<script src="./js/auth.js" defer></script>
 <script src="./js/admin.js" defer></script>
 </body>
 </html>

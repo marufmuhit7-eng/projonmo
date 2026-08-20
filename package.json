@@ -11,10 +11,11 @@
   "scripts": {
     "build": "python3 tools/build.py",
     "dev": "python3 tools/serve.py",
-    "test": "node tools/storage.test.js && node tools/settings.test.js && node tools/apps.test.js",
+    "test": "node tools/storage.test.js && node tools/settings.test.js && node tools/auth.test.js && node tools/apps.test.js",
     "test:storage": "node tools/storage.test.js",
     "test:settings": "node tools/settings.test.js",
-    "test:apps": "node tools/apps.test.js"
+    "test:apps": "node tools/apps.test.js",
+    "test:auth": "node tools/auth.test.js"
   },
   "keywords": [
     "static-site",

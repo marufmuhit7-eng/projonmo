@@ -18,9 +18,10 @@ private.
 
 ### 1. A static admin panel cannot be secured by frontend code. At all.
 
-`js/admin.js` checks a password held in a JavaScript constant, and that file is
-downloadable from your public domain at `/js/admin.js`. Anyone can read it. The
-password also guards nothing real — the data lives in the visitor's own browser,
+`/admin` has a real login form now — username, hashed password, session, change
+password, logout — and none of it is security. It all runs in the visitor's
+browser, so anyone can open DevTools and write the session key by hand. The
+login also guards nothing real — the data lives in the visitor's own browser,
 so anyone can skip the login and type:
 
 ```js
@@ -92,6 +93,31 @@ Cheapest path from here, in order:
    registrations in a spreadsheet. Weakest auth story of the three.
 
 ---
+
+## Admin login
+
+`/admin` opens on a login form. Nothing in the dashboard renders until you are
+signed in.
+
+| | |
+| --- | --- |
+| Default username | `admin` |
+| Default password | `admin123` |
+| Session | `sessionStorage` — closing the tab logs you out; reloading does not |
+| Credential | `localStorage`, as a random salt plus a SHA-256 hash. The password itself is never written anywhere |
+| Change password | **পাসওয়ার্ড** tab: current + new + confirm, minimum 6 characters, new salt on every change |
+| Forgot it | **ডিফল্টে ফিরিয়ে নাও** in the same tab resets to `admin` / `admin123` |
+| Logout | Button in the dashboard header |
+
+A red banner sits at the top of the dashboard until the default password is
+replaced.
+
+Wrong username and wrong password return the identical error, so the form
+cannot be used to discover valid usernames, and the hash comparison is
+length-independent so timing leaks nothing. Both are good hygiene, neither
+makes this real authentication — see the security note above.
+
+`js/auth.js` is only shipped to `admin.html`; the public page never loads it.
 
 ## Exam timer control (admin-managed)
 
@@ -205,6 +231,7 @@ Run step 6's `curl` checks after configuring, before the event.
 │   ├── shared/
 │   │   ├── config.js                     ← Supabase URL + anon key go HERE
 │   │   ├── settings.js                   exam-timer settings, swappable backend
+│   │   ├── auth.js                       admin login gate (admin page only)
 │   │   ├── styles.css
 │   │   ├── storage.js
 │   │   ├── common.js                     QUESTIONS, CATEGORY_LABELS, getCategoryKey
@@ -233,7 +260,8 @@ Run step 6's `curl` checks after configuring, before the event.
 │   ├── carve.py                          one-time migration, kept for provenance
 │   ├── storage.test.js                   9 assertions
 │   ├── settings.test.js                  32 assertions
-│   └── apps.test.js                      61 assertions
+│   ├── auth.test.js                      36 assertions
+│   └── apps.test.js                      88 assertions
 └── package.json
 ```
 
@@ -361,10 +389,11 @@ practical options are:
 
 Checklist:
 
-- [ ] `ADMIN_PASSWORD` changed from the committed default `UHF2026Admin`
+- [ ] Admin password changed from the default `admin` / `admin123` (the panel
+      shows a red banner until you do)
 - [ ] `/admin` kept out of sitemaps, social posts and the public nav
 - [ ] `x-robots-tag: noindex` confirmed with `curl -sI`
-- [ ] Understood that `/js/admin.js` is publicly downloadable and contains that password
+- [ ] Understood that the login runs client-side and can be bypassed from DevTools
 - [ ] Real fix scheduled: Supabase Auth + server-side checks
 
 ## Development
@@ -372,7 +401,7 @@ Checklist:
 ```bash
 npm run build     # regenerate index.html, admin.html and assets from src/
 npm run dev       # site on :8000, /admin included (mirrors vercel.json)
-npm test          # 9 + 32 + 61 assertions (needs the dev server + jsdom)
+npm test          # 9 + 32 + 36 + 88 assertions (needs the dev server + jsdom)
 ```
 
 ```bash

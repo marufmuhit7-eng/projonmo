@@ -129,6 +129,95 @@ function load(urlPath) {
   check('zero uncaught JS errors', admErrors.length === 0, admErrors.join(' || '));
 
   // =====================================================================
+  console.log('\nD2. ADMIN LOGIN GATE\n');
+
+  const aw = adm.window;
+  const el = (id) => adoc.getElementById(id);
+  const shown = (id) => !el(id).classList.contains('hidden');
+
+  check('login form rendered with username + password fields',
+    el('adminUserInput')?.type === 'text' && el('adminPassInput')?.type === 'password');
+  check('password field is masked, not plain text', el('adminPassInput').type === 'password');
+  check('show/hide password button present', !!el('adminPassToggle'));
+  check('login form has a real submit handler (Enter works)', el('adminLoginForm')?.tagName === 'FORM');
+  check('dashboard is HIDDEN before login', !shown('adminPanel') && shown('adminLogin'));
+  check('logout button present in the dashboard header',
+    /লগআউট/.test(el('adminPanel').textContent));
+  check('change-password section exists with all three fields',
+    !!el('curPassInput') && !!el('newPassInput') && !!el('confirmPassInput') && !!el('changePassBtn'));
+  check('change-password section titled "পাসওয়ার্ড পরিবর্তন করুন"',
+    /পাসওয়ার্ড পরিবর্তন করুন/.test(el('adminPassword').textContent));
+
+  // wrong credentials
+  el('adminUserInput').value = 'admin';
+  el('adminPassInput').value = 'wrongpass';
+  await aw.adminLogin();
+  await new Promise((r) => setTimeout(r, 150));
+  check('wrong password shows an error and keeps the dashboard hidden',
+    /ভুল/.test(el('adminLoginMsg').textContent) && !shown('adminPanel'));
+  check('the password field is cleared after a failed attempt', el('adminPassInput').value === '');
+
+  // correct credentials
+  el('adminUserInput').value = 'admin';
+  el('adminPassInput').value = 'admin123';
+  await aw.adminLogin();
+  await new Promise((r) => setTimeout(r, 200));
+  check('admin / admin123 unlocks the dashboard', shown('adminPanel') && !shown('adminLogin'));
+  check('session stored in sessionStorage', !!aw.sessionStorage.getItem('uhf:admin:session'));
+  check('header shows who is signed in', /admin/.test(el('adminWhoami').textContent));
+  check('default-password warning is visible until it is changed', shown('adminDefaultPassWarning'));
+  check('admin controls are reachable only now',
+    !!el('timerEnabledInput') && !!el('adminQJson'));
+
+  // change password
+  el('curPassInput').value = 'admin123';
+  el('newPassInput').value = 'uhf';
+  el('confirmPassInput').value = 'uhf';
+  await aw.changeAdminPassword();
+  await new Promise((r) => setTimeout(r, 150));
+  check('too-short password rejected with a Bengali message',
+    /৬ অক্ষর/.test(el('adminPassMsg').textContent));
+
+  el('curPassInput').value = 'admin123';
+  el('newPassInput').value = 'heritage2026';
+  el('confirmPassInput').value = 'different';
+  await aw.changeAdminPassword();
+  await new Promise((r) => setTimeout(r, 150));
+  check('mismatched confirmation rejected', /মিলছে না/.test(el('adminPassMsg').textContent));
+
+  el('curPassInput').value = 'admin123';
+  el('newPassInput').value = 'heritage2026';
+  el('confirmPassInput').value = 'heritage2026';
+  await aw.changeAdminPassword();
+  await new Promise((r) => setTimeout(r, 200));
+  check('valid change succeeds', /বদলে গেছে/.test(el('adminPassMsg').textContent),
+    el('adminPassMsg').textContent);
+  check('default-password warning disappears after the change', !shown('adminDefaultPassWarning'));
+  check('fields are cleared after a successful change',
+    el('curPassInput').value === '' && el('newPassInput').value === '');
+  check('new password is stored hashed, never in plain text',
+    !String(aw.localStorage.getItem('uhf:admin:credential')).includes('heritage2026'));
+
+  // logout
+  aw.adminLogout();
+  check('logout hides the dashboard and shows the login form again',
+    !shown('adminPanel') && shown('adminLogin'));
+  check('logout clears the session', !aw.sessionStorage.getItem('uhf:admin:session'));
+  check('logout confirmation message shown', /লগআউট হয়ে গেছে/.test(el('adminLoginMsg').textContent));
+
+  // log back in with the NEW password for the remaining sections
+  el('adminUserInput').value = 'admin';
+  el('adminPassInput').value = 'heritage2026';
+  await aw.adminLogin();
+  await new Promise((r) => setTimeout(r, 200));
+  check('the changed password logs back in', shown('adminPanel'));
+
+  check('auth.js is NOT shipped to the public page',
+    !fs.existsSync(path.join(ROOT, 'index.html')) || !text('index.html').includes('auth.js'));
+  check('the old hardcoded ADMIN_PASSWORD constant is gone',
+    !text('js/admin.js').includes('const ADMIN_PASSWORD'));
+
+  // =====================================================================
   console.log('\nE. EXAM TIMER CONTROL\n');
 
   check('section titled "পরীক্ষার টাইমার নিয়ন্ত্রণ" / "Exam Timer Control"',

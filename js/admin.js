@@ -1,33 +1,148 @@
-const ADMIN_PASSWORD = "UHF2026Admin";
-/* ---------- Admin ---------- */
+/* =========================================================================
+   Admin authentication  ·  window.adminAuth does the credential work
+   ========================================================================= */
+
 let adminLoggedIn = false;
 
-function adminLogin(){
-  const pass = document.getElementById('adminPassInput').value;
-  const msg = document.getElementById('adminLoginMsg');
-  if(pass === ADMIN_PASSWORD){
-    adminLoggedIn = true;
-    document.getElementById('adminLogin').classList.add('hidden');
-    document.getElementById('adminPanel').classList.remove('hidden');
-    document.getElementById('adminPassInput').value = '';
-    msg.innerHTML = '';
-    loadAdminQuestions();
-  }else{
-    msg.innerHTML = '<div class="msg err"><span class="bn">পাসওয়ার্ড ভুল।</span><span class="en">Incorrect password.</span></div>';
-  }
+/** Paint the header line and the default-password nag. */
+function renderAdminIdentity(){
+  const who = document.getElementById('adminWhoami');
+  const warn = document.getElementById('adminDefaultPassWarning');
+  const user = window.adminAuth.currentUser();
+  who.textContent = user ? '👤 ' + user : '';
+  warn.classList.toggle('hidden', !window.adminAuth.isUsingDefaultPassword());
 }
 
-function adminLogout(){
+/** Reveal the dashboard and load whichever sub-tab is active. */
+function enterAdminDashboard(){
+  adminLoggedIn = true;
+  document.getElementById('adminLogin').classList.add('hidden');
+  document.getElementById('adminPanel').classList.remove('hidden');
+  document.getElementById('adminPassInput').value = '';
+  document.getElementById('adminLoginMsg').innerHTML = '';
+  renderAdminIdentity();
+  const active = document.querySelector('.admin-sub-btn.active');
+  switchAdminSub(active ? active.dataset.sub : 'questions');
+}
+
+function showAdminLogin(){
   adminLoggedIn = false;
   document.getElementById('adminPanel').classList.add('hidden');
   document.getElementById('adminLogin').classList.remove('hidden');
 }
+
+const LOGIN_ERRORS = {
+  'empty':           { bn: 'ইউজারনেম ও পাসওয়ার্ড দুটোই লেখো।', en: 'Enter both username and password.' },
+  'bad-credentials': { bn: 'ইউজারনেম বা পাসওয়ার্ড ভুল।',       en: 'Incorrect username or password.' }
+};
+
+async function adminLogin(){
+  const msg = document.getElementById('adminLoginMsg');
+  const username = document.getElementById('adminUserInput').value;
+  const password = document.getElementById('adminPassInput').value;
+  msg.innerHTML = '';
+  try{
+    await window.adminAuth.login(username, password);
+    enterAdminDashboard();
+  }catch(err){
+    // Deliberately identical wording for a wrong username and a wrong password,
+    // so the form cannot be used to discover valid usernames.
+    const e = LOGIN_ERRORS[err.code] || { bn: 'লগইন ব্যর্থ হয়েছে।', en: 'Login failed.' };
+    msg.innerHTML = '<div class="msg err"><span class="bn">' + e.bn + '</span><span class="en">' + e.en + '</span></div>';
+    document.getElementById('adminPassInput').value = '';
+    document.getElementById('adminPassInput').focus();
+  }
+}
+
+function adminLogout(){
+  window.adminAuth.logout();
+  showAdminLogin();
+  document.getElementById('adminUserInput').value = '';
+  document.getElementById('adminPassInput').value = '';
+  document.getElementById('adminLoginMsg').innerHTML =
+    '<div class="msg ok"><span class="bn">লগআউট হয়ে গেছে।</span><span class="en">You have been logged out.</span></div>';
+}
+
+function toggleAdminPassword(){
+  const input = document.getElementById('adminPassInput');
+  const btn = document.getElementById('adminPassToggle');
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  btn.innerHTML = show
+    ? '<span class="bn">লুকাও</span><span class="en">Hide</span>'
+    : '<span class="bn">দেখাও</span><span class="en">Show</span>';
+}
+
+/* ---------- Change password ---------- */
+
+const CHANGE_ERRORS = {
+  'empty':           { bn: 'তিনটি ঘরই পূরণ করো।',                     en: 'Fill in all three fields.' },
+  'mismatch':        { bn: 'নতুন পাসওয়ার্ড দুটি মিলছে না।',            en: 'The two new passwords do not match.' },
+  'too-short':       { bn: 'নতুন পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।', en: 'The new password must be at least 6 characters.' },
+  'same-as-current': { bn: 'নতুন পাসওয়ার্ড আগেরটির মতোই হয়ে গেছে।',   en: 'The new password is the same as the current one.' },
+  'wrong-current':   { bn: 'বর্তমান পাসওয়ার্ড ভুল।',                   en: 'Current password is wrong.' }
+};
+
+async function changeAdminPassword(){
+  if(!adminLoggedIn) return;
+  const msg = document.getElementById('adminPassMsg');
+  const btn = document.getElementById('changePassBtn');
+  msg.innerHTML = '';
+  btn.disabled = true;
+  try{
+    await window.adminAuth.changePassword(
+      document.getElementById('curPassInput').value,
+      document.getElementById('newPassInput').value,
+      document.getElementById('confirmPassInput').value
+    );
+    ['curPassInput','newPassInput','confirmPassInput'].forEach(id => { document.getElementById(id).value = ''; });
+    renderAdminIdentity();
+    msg.innerHTML = '<div class="msg ok"><span class="bn">পাসওয়ার্ড বদলে গেছে। পরের বার নতুনটি দিয়ে লগইন করো।</span>' +
+      '<span class="en">Password changed. Use the new one next time you log in.</span></div>';
+  }catch(err){
+    const e = CHANGE_ERRORS[err.code] || { bn: 'পাসওয়ার্ড বদলানো যায়নি।', en: 'Could not change the password.' };
+    msg.innerHTML = '<div class="msg err"><span class="bn">' + e.bn + '</span><span class="en">' + e.en + '</span></div>';
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+/** Forgotten password escape hatch — back to admin / admin123. */
+async function resetAdminPassword(){
+  if(!adminLoggedIn) return;
+  const ok = window.confirm('পাসওয়ার্ড ডিফল্টে (admin / admin123) ফিরিয়ে নেবে?\n\nReset the password back to admin / admin123?');
+  if(!ok) return;
+  await window.adminAuth.resetToDefaults();
+  renderAdminIdentity();
+  document.getElementById('adminPassMsg').innerHTML =
+    '<div class="msg ok"><span class="bn">পাসওয়ার্ড ডিফল্টে ফিরে গেছে: admin / admin123</span>' +
+    '<span class="en">Password reset to the default: admin / admin123</span></div>';
+}
+
+/* Wire the forms. Submit handlers (not click) so Enter works in every field. */
+document.getElementById('adminLoginForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  adminLogin();
+});
+document.getElementById('adminChangePassForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  changeAdminPassword();
+});
+
+/* Restore an open session on load, so a reload does not log the organiser out.
+   sessionStorage clears itself when the tab closes. */
+window.adminAuth.ready().then(function(){
+  if(window.adminAuth.isLoggedIn()) enterAdminDashboard();
+  else renderAdminIdentity();
+});
 
 function switchAdminSub(sub){
   document.querySelectorAll('.admin-sub-btn').forEach(b=>b.classList.toggle('active', b.dataset.sub===sub));
   document.getElementById('adminQuestions').classList.toggle('hidden', sub!=='questions');
   document.getElementById('adminTimer').classList.toggle('hidden', sub!=='timer');
   document.getElementById('adminRegs').classList.toggle('hidden', sub!=='regs');
+  document.getElementById('adminPassword').classList.toggle('hidden', sub!=='password');
+  if(sub==='questions') loadAdminQuestions();
   if(sub==='regs') loadAdminRegistrations();
   if(sub==='timer') loadTimerSettings();
 }
