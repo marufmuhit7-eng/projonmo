@@ -218,6 +218,22 @@ const text = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
     JSON.stringify(root.headers) === JSON.stringify(pubCfg.headers));
   check('no config mixes legacy routes with cleanUrls/headers',
     [root, pubCfg, admCfg].every((c) => !('routes' in c)));
+  check('public site ships a branded 404.html (Vercel serves it automatically)',
+    fs.existsSync(path.join(ROOT, 'public-site/404.html')) &&
+    /৪০৪/.test(text('public-site/404.html')) &&
+    /noindex/.test(text('public-site/404.html')));
+  check('public 404 uses root-absolute asset paths (it can be served from any depth)',
+    /href="\/css\/styles\.css"/.test(text('public-site/404.html')));
+  check('admin ships a bare 404 that reveals nothing about the deployment',
+    fs.existsSync(path.join(ROOT, 'admin-panel/404.html')) &&
+    !/admin/i.test(text('admin-panel/404.html').replace(/<title>404<\/title>/, '')) &&
+    /noindex, nofollow/.test(text('admin-panel/404.html')));
+  check('NO SPA catch-all rewrite was added (a wrong URL must 404, not silently show home)',
+    [root, pubCfg, admCfg].every((c) => !c.rewrites));
+  check('public site still contains no admin.html and no /admin route',
+    !fs.existsSync(path.join(ROOT, 'public-site/admin.html')) &&
+    !fs.existsSync(path.join(ROOT, 'public-site/admin')) &&
+    !JSON.stringify(pubCfg).includes('admin'));
   check('the directory each config points at really exists and holds an index.html',
     fs.existsSync(path.join(ROOT, 'public-site/index.html')) &&
     fs.existsSync(path.join(ROOT, 'admin-panel/index.html')));

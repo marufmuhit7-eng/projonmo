@@ -82,6 +82,66 @@ ADMIN_NAV = f"""<nav class="topnav">
   </div>
 </nav>"""
 
+# Vercel serves 404.html from the output directory whenever no static file
+# matches. Without it the visitor gets Vercel's raw plain-text "404: NOT_FOUND".
+PUBLIC_404 = f"""<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>পাতা পাওয়া যায়নি | Page not found</title>
+<meta name="robots" content="noindex, follow">
+<link rel="icon" href="/images/{LOGO}">
+{FONTS}
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="lang-bn" style="display:flex;flex-direction:column;min-height:100vh;">
+<main class="wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 24px;">
+  <img src="/images/{LOGO}" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;object-position:50% 42%;border:2px solid var(--brass);box-shadow:0 0 0 3px var(--indigo-deep);">
+  <div style="font-family:var(--f-mono);font-size:3.2rem;font-weight:700;color:var(--clay);margin:22px 0 6px;">৪০৪</div>
+  <h1 style="margin:0 0 14px;font-size:1.5rem;">
+    <span class="bn">এই পাতাটি খুঁজে পাওয়া যায়নি</span><span class="en">This page could not be found</span>
+  </h1>
+  <p style="margin:0 0 30px;max-width:460px;color:rgba(36,28,21,0.72);">
+    <span class="bn">ঠিকানাটি হয়তো ভুল, নয়তো পাতাটি সরিয়ে ফেলা হয়েছে। নিচের বোতামে চাপ দিয়ে হোমে ফিরে যাও।</span>
+    <span class="en">The address may be wrong, or the page has moved. Use the button below to go back home.</span>
+  </p>
+  <a href="/" class="btn btn-primary" style="text-decoration:none;">
+    <span class="bn">হোমে ফিরে যাও</span><span class="en">Back to home</span>
+  </a>
+</main>
+<footer>
+  <div class="wrap">
+    <span class="bn">উত্তরবঙ্গ হেরিটেজ ফেস্ট © ২০২৬</span>
+    <span class="en">Uttarbanga Heritage Fest © 2026</span>
+  </div>
+</footer>
+<script>
+  document.querySelector('a.btn').insertAdjacentHTML('afterend',
+    '<button class="lang-toggle" style="margin-top:26px;" onclick="document.body.classList.toggle(\\'lang-bn\\');document.body.classList.toggle(\\'lang-en\\');">EN / বাং</button>');
+</script>
+</body>
+</html>
+"""
+
+# The admin 404 deliberately says nothing about what this deployment is.
+ADMIN_404 = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>404</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<style>
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+       background:#151A28;color:#8C8270;font:500 14px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;}
+</style>
+</head>
+<body>404</body>
+</html>
+"""
+
 
 def page(head: str, body: str, scripts: list[str], vendor: str = "") -> str:
     tags = "\n".join(f'<script src="./js/{s}" defer></script>' for s in scripts)
@@ -133,6 +193,7 @@ def main() -> None:
         encoding="utf-8",
     )
     (pub / "robots.txt").write_text("User-agent: *\nAllow: /\n", encoding="utf-8")
+    (pub / "404.html").write_text(PUBLIC_404, encoding="utf-8")
 
     # ---------------- B. admin panel ----------------
     adm = ROOT / "admin-panel"
@@ -153,6 +214,7 @@ def main() -> None:
     (adm / "robots.txt").write_text(
         "# Admin panel — must never be indexed.\nUser-agent: *\nDisallow: /\n", encoding="utf-8"
     )
+    (adm / "404.html").write_text(ADMIN_404, encoding="utf-8")
 
     # ---------------- root fallback ----------------
     # If someone imports this repo into Vercel WITHOUT setting the Root
