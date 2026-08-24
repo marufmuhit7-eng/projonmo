@@ -40,9 +40,10 @@ function check(label, cond, detail) {
 
   // ---- defaults -------------------------------------------------------
   const d = await S.load();
-  check('SHIPPED DEFAULT: exam is OPEN — no countdown, no lock',
-    d.timerEnabled === false && d.offBehavior === 'live', d);
-  check('examStatus() on defaults is "live"', S.examStatus(d) === 'live', S.examStatus(d));
+  check('SHIPPED DEFAULT: exam is LOCKED',
+    d.isUnlocked === false, d);
+  check('examStatus() on defaults is "countdown", never "live"',
+    S.examStatus(d) === 'countdown', S.examStatus(d));
   check('default exam date is the original 25 Sep 2026 +06:00',
     d.examStartDate === '2026-09-25T00:00:00+06:00', d.examStartDate);
 
@@ -73,22 +74,46 @@ function check(label, cond, detail) {
     S.fromDhakaInput('2026-02-30T10:00'));
 
   // ---- normalise guards ----------------------------------------------
-  check('normalise: junk object falls back to defaults', S.normalise({ timerEnabled: 'yes' }).timerEnabled === false);
+  check('normalise: junk object falls back to defaults', S.normalise({ timerEnabled: 'yes' }).timerEnabled === true);
+
+  // ---- the security boundary: FAIL CLOSED -----------------------------
+  // Every one of these was an OPEN exam before the fix.
+  check('SECURITY: no settings at all -> locked',
+    S.examStatus(S.normalise(null)) !== 'live');
+  check('SECURITY: empty object (missing document) -> locked',
+    S.examStatus(S.normalise({})) !== 'live');
+  check('SECURITY: isUnlocked omitted -> locked',
+    S.normalise({ timerEnabled: false, offBehavior: 'live' }).isUnlocked === false);
+  check('SECURITY: isUnlocked "true" as a STRING does not unlock',
+    S.normalise({ isUnlocked: 'true' }).isUnlocked === false);
+  check('SECURITY: isUnlocked 1 does not unlock',
+    S.normalise({ isUnlocked: 1 }).isUnlocked === false);
+  check('SECURITY: isUnlocked null does not unlock',
+    S.normalise({ isUnlocked: null }).isUnlocked === false);
+  check('SECURITY: a PAST date does NOT open the exam on its own',
+    S.examStatus({ isUnlocked: false, timerEnabled: true, examStartDate: '2000-01-01T00:00:00+06:00' }) === 'countdown');
+  check('ONLY boolean true unlocks',
+    S.normalise({ isUnlocked: true }).isUnlocked === true &&
+    S.examStatus({ isUnlocked: true }) === 'live');
+  check('locked + message behaviour still shows the message',
+    S.examStatus({ isUnlocked: false, timerEnabled: false, offBehavior: 'message' }) === 'closed');
 
   // ---- examStatus across every combination -----------------------------
-  check('examStatus: timer off + live -> live',
-    S.examStatus({ timerEnabled: false, offBehavior: 'live' }) === 'live');
+  check('examStatus: timer off + live but still locked -> countdown',
+    S.examStatus({ timerEnabled: false, offBehavior: 'live' }) === 'countdown');
   check('examStatus: timer off + message -> closed',
     S.examStatus({ timerEnabled: false, offBehavior: 'message' }) === 'closed');
+  check('examStatus: unlocked overrides everything -> live',
+    S.examStatus({ isUnlocked: true, timerEnabled: true, examStartDate: '2099-01-01T00:00:00+06:00' }) === 'live');
   check('examStatus: timer on + future date -> countdown',
     S.examStatus({ timerEnabled: true, examStartDate: '2099-01-01T00:00:00+06:00' }) === 'countdown');
-  check('examStatus: timer on + past date -> live',
-    S.examStatus({ timerEnabled: true, examStartDate: '2000-01-01T00:00:00+06:00' }) === 'live');
+  check('examStatus: timer on + past date stays LOCKED (was the bug)',
+    S.examStatus({ timerEnabled: true, examStartDate: '2000-01-01T00:00:00+06:00' }) === 'countdown');
   check('normalise: bad date falls back to the default date',
     S.normalise({ examStartDate: 'lol' }).examStartDate === S.DEFAULTS.examStartDate);
   check('normalise: unknown offBehavior collapses to "live"',
     S.normalise({ offBehavior: 'explode' }).offBehavior === 'live');
-  check('normalise: null is safe', S.normalise(null).timerEnabled === false);
+  check('normalise: null is safe', S.normalise(null).isUnlocked === false);
 
   // ---- Bangla rendering (design must not change) ----------------------
   check('formatBnDateTime renders Bangla digits and month',
@@ -99,6 +124,7 @@ function check(label, cond, detail) {
   // ---- save / load round trip ----------------------------------------
   const saved = await S.save({ timerEnabled: false, offBehavior: 'message', customMessage: 'পরীক্ষা এখন চলছে!' });
   check('save() returns the merged settings', saved.timerEnabled === false && saved.offBehavior === 'message');
+  check('save() that omits isUnlocked does not silently unlock', saved.isUnlocked === false);
   check('save() preserves fields not in the patch', saved.examStartDate === S.DEFAULTS.examStartDate);
   const reloaded = await S.load();
   check('load() reads back what save() wrote', reloaded.customMessage === 'পরীক্ষা এখন চলছে!', reloaded);

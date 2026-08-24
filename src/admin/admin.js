@@ -189,11 +189,11 @@ function renderTimerStatus(s){
   const status = window.examSettings.examStatus(s);
   const view = {
     live:      { text: 'পরীক্ষা চালু · LIVE',      bg: 'var(--sage)',  fg: 'var(--cream)',
-                 bn: 'এখন যে কেউ পরীক্ষা শুরু করতে পারবে। কাউন্টডাউন বক্স লুকানো আছে।',
-                 en: 'Anyone can start the exam now. The countdown box is hidden.' },
+                 bn: 'মাস্টার সুইচ চালু — সব ভিজিটর এখন পরীক্ষা দিতে পারছে।',
+                 en: 'Master switch is on — every visitor can sit the exam right now.' },
     countdown: { text: 'লকড · COUNTDOWN',          bg: 'var(--clay)',  fg: 'var(--cream)',
-                 bn: 'পরীক্ষা বন্ধ। নিচের তারিখ পর্যন্ত কাউন্টডাউন দেখা যাচ্ছে, তারপর নিজে থেকেই খুলে যাবে।',
-                 en: 'Locked. The countdown runs to the date below, then the exam opens by itself.' },
+                 bn: 'পরীক্ষা বন্ধ, সব ব্রাউজারে কাউন্টডাউন দেখাচ্ছে। তারিখ পেরোলেও নিজে থেকে খুলবে না — উপরের মাস্টার সুইচ দিয়ে খুলতে হবে।',
+                 en: 'Locked; every browser shows the countdown. It will NOT open by itself when the date passes — use the master switch above.' },
     closed:    { text: 'লকড · CLOSED',             bg: 'var(--stone)', fg: 'var(--cream)',
                  bn: 'পরীক্ষা বন্ধ। কাউন্টডাউনের বদলে তোমার লেখা বার্তাটি দেখানো হচ্ছে।',
                  en: 'Locked. Your message is shown instead of a countdown.' }
@@ -216,6 +216,7 @@ async function loadTimerSettings(){
   renderTimerBackendNote();
   try{
     const s = await window.examSettings.load();
+    document.getElementById('examUnlockedInput').checked = s.isUnlocked === true;
     document.getElementById('timerEnabledInput').checked = s.timerEnabled;
     document.getElementById('timerDateInput').value = window.examSettings.toDhakaInput(s.examStartDate);
     document.getElementById('timerOffBehaviorInput').value = s.offBehavior;
@@ -255,6 +256,9 @@ async function saveTimerSettings(){
   btn.disabled = true;
   try{
     const s = await window.examSettings.save({
+      // isUnlocked is deliberately absent: the master switch owns it and saves
+      // on flip. Sending it from here would let a stale checkbox re-lock or
+      // re-open the exam as a side effect of editing the date.
       timerEnabled: document.getElementById('timerEnabledInput').checked,
       examStartDate: iso,
       offBehavior: behavior,
@@ -276,11 +280,51 @@ async function saveTimerSettings(){
   }
 }
 
+/*
+ * MASTER GATE — writes isUnlocked to the shared backend the moment it is
+ * flipped. Firestore's onSnapshot then pushes it to every open browser.
+ *
+ * On failure the checkbox is put back where it was: the admin must never be
+ * left looking at a switch that says "open" when the database says locked.
+ */
+async function onExamUnlockedToggled(){
+  const box = document.getElementById('examUnlockedInput');
+  const msg = document.getElementById('examUnlockedMsg');
+  const wanted = box.checked;
+  box.disabled = true;
+  msg.innerHTML = '<div class="small-note"><span class="bn">সংরক্ষণ হচ্ছে…</span><span class="en">Saving…</span></div>';
+  try{
+    const s = await window.examSettings.save({ isUnlocked: wanted });
+    renderTimerStatus(s);
+    if(!window.examSettings.isRemote){
+      msg.innerHTML = '<div class="msg err"><span class="bn">⚠️ কোনো শেয়ার্ড ডেটাবেস কনফিগার করা নেই — এই পরিবর্তন <strong>শুধু এই ব্রাউজারে</strong> সেভ হয়েছে। অন্য কেউ এর প্রভাব দেখবে না।</span>' +
+        '<span class="en">⚠️ No shared database is configured — this was saved <strong>in this browser only</strong>. Nobody else will see it.</span></div>';
+    }else if(wanted){
+      msg.innerHTML = '<div class="msg ok"><span class="bn">✅ পরীক্ষা এখন <strong>সবার জন্য চালু</strong>। সব খোলা ব্রাউজারে সঙ্গে সঙ্গে পৌঁছে গেছে।</span>' +
+        '<span class="en">✅ The exam is now <strong>open to everyone</strong>. It reached every open browser instantly.</span></div>';
+    }else{
+      msg.innerHTML = '<div class="msg ok"><span class="bn">🔒 পরীক্ষা <strong>লক</strong> করা হয়েছে। সবাই আবার কাউন্টডাউন দেখছে।</span>' +
+        '<span class="en">🔒 The exam is <strong>locked</strong>. Everyone is back on the countdown.</span></div>';
+    }
+  }catch(err){
+    console.error(err);
+    box.checked = !wanted;   // never lie about the real state
+    msg.innerHTML = '<div class="msg err"><span class="bn">সংরক্ষণ ব্যর্থ, অবস্থা বদলায়নি: ' + err.message +
+      '</span><span class="en">Save failed, nothing changed: ' + err.message + '</span></div>';
+  }finally{
+    box.disabled = false;
+  }
+}
+document.getElementById('examUnlockedInput').addEventListener('change', onExamUnlockedToggled);
+
 /* Keep the message fields in step with the two controls that govern them. */
 document.getElementById('timerOffBehaviorInput').addEventListener('change', syncTimerMessageVisibility);
 document.getElementById('timerEnabledInput').addEventListener('change', function(){
   syncTimerMessageVisibility();
-  renderTimerStatus(Object.assign({}, window.examSettings.current(), { timerEnabled: this.checked }));
+  renderTimerStatus(Object.assign({}, window.examSettings.current(), {
+    timerEnabled: this.checked,
+    isUnlocked: document.getElementById('examUnlockedInput').checked
+  }));
 });
 
 async function loadAdminQuestions(){

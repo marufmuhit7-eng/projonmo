@@ -144,27 +144,80 @@ The countdown is no longer hardcoded. The organiser controls it from
 
 | Control | Bengali label | Effect |
 | --- | --- | --- |
-| ON/OFF toggle | কাউন্টডাউন টাইমার দেখাও (পরীক্ষা লক করো) | **Off = exam LIVE now.** On = locked until the date below |
+| **Master switch** | পরীক্ষা সবার জন্য চালু করো | **The gate.** On = exam open for everyone. Off = everyone sees the countdown. Saves on flip |
+| ON/OFF toggle | কাউন্টডাউন টাইমার দেখাও (পরীক্ষা লক করো) | Chooses the *locked* view: countdown, or your message |
 | Date & time picker | পরীক্ষা শুরুর তারিখ ও সময় | The moment the exam opens (Bangladesh time) |
 | Off behaviour | টাইমার বন্ধ থাকলে কী হবে? | `live` = exam open now · `message` = show a notice |
 | Message (bn / en) | বার্তা | Shown when the timer is off and behaviour is `message` |
 | Status badge | পরীক্ষা চালু · LIVE / লকড · COUNTDOWN / লকড · CLOSED | What a candidate sees right now, in one line |
 
-**Shipped default: the exam is LIVE.** A fresh visitor sees the rules and the
-"পরীক্ষা শুরু করো" button, not a countdown. Lock it by switching the countdown
-on in the admin panel.
+**Shipped default: the exam is LOCKED, and it fails closed.**
 
-Behaviour on the exam page:
+This was a real bug, not a preference. The lock used to live in `localStorage`,
+which is per browser and per origin — so the *only* device that knew the exam
+was locked was the admin's own. Every other visitor, on every other browser and
+phone, got the shipped default of "open" and could sit the exam early.
 
-| Setting | Countdown box | Exam form |
-| --- | --- | --- |
-| ON, date in the future | visible, ticking to the date | hidden |
-| ON, date passed | hidden | **open** |
-| OFF + `live` | hidden | **open**, regardless of the date |
-| OFF + `message` | hidden | hidden, organiser's message shown instead |
+The gate is now a single field, `isUnlocked`, and **only a literal boolean
+`true` from the backend opens the exam.** Everything else keeps it shut:
+
+| Situation | Result |
+| --- | --- |
+| Fresh browser, never seen the admin panel | 🔒 countdown |
+| Firestore document does not exist yet | 🔒 countdown |
+| Offline, or the fetch failed | 🔒 countdown |
+| SDK blocked by a firewall / ad-blocker | 🔒 countdown |
+| `isUnlocked` is `"true"` (string), `1`, `null`, or missing | 🔒 countdown |
+| `examStartDate` has passed but nobody unlocked it | 🔒 countdown |
+| `isUnlocked === true` | ✅ exam open |
+
+Two deliberate consequences:
+
+- **A passing date no longer opens the exam by itself.** The clock reaching
+  25 Sep 2026 is not consent; an organiser flips the switch. This prevents a
+  wrong date, or a visitor's wrong device clock, from opening the exam.
+- **Locking mid-exam takes effect immediately.** `onSnapshot` pushes the change
+  and any in-progress attempt is torn down on every screen at once.
+
+The exam section also *starts* locked in the HTML, before any JavaScript runs,
+so a slow network cannot flash the questions on screen.
 
 The দিন / ঘণ্টা / মিনিট / সেকেন্ড boxes, their colours and their element ids are
 untouched — only what drives them changed.
+
+### Turning on Firebase Firestore
+
+The exam lock syncs globally through Firestore: collection `settings`,
+document `examControl`.
+
+```
+settings/examControl
+  { isUnlocked: false, targetDate: "2026-09-25T00:00:00" }
+```
+
+1. Firebase Console → create a project → **Firestore Database** → Create.
+2. **Rules** → paste `firebase/firestore.rules` from this repo → Publish.
+   This is the part that actually protects you: the world may *read*
+   `examControl`, only a signed-in organiser may *write* it.
+3. **Authentication** → enable Email/Password → add ONE organiser account.
+   Do **not** allow public sign-up: anyone who can create an account can
+   satisfy `request.auth != null` and unlock the exam.
+4. Project settings → General → your web app → copy the config into
+   `FIREBASE` in `src/shared/config.js`.
+5. `npm run build`, then redeploy.
+
+`targetDate` is stored without a timezone offset, exactly as specified. Since
+Bangladesh has no DST, the app appends a fixed `+06:00` on read so the
+countdown shows the same remaining time in Dhaka and in London. A bare string
+would otherwise be parsed in each visitor's own timezone.
+
+Leave `FIREBASE.projectId` empty and nothing about Firebase loads — the site
+falls back to Supabase if configured, then to `localStorage`. **In every
+fallback the exam stays locked**, so a misconfiguration can never open it.
+
+Verify it: open the site in a browser that has never touched the admin panel.
+You must see the countdown. Then flip the master switch in the admin panel and
+watch that other browser open the exam within about a second, without a refresh.
 
 ### localStorage or Supabase? — Supabase, and it is not close
 

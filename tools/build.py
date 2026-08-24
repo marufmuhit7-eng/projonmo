@@ -50,6 +50,28 @@ def supabase_configured() -> bool:
     return bool(m and m.group(1).strip())
 
 
+def firebase_configured() -> bool:
+    """True when src/shared/config.js has a non-empty FIREBASE.projectId."""
+    cfg = (SRC / "shared" / "config.js").read_text(encoding="utf-8")
+    m = re.search(r"projectId:\s*'([^']*)'", cfg)
+    return bool(m and m.group(1).strip())
+
+
+# Firebase ships as ES modules. settings.js is a classic script, so this shim
+# imports the modular SDK and hangs it on window.firebaseSDK before the classic
+# scripts (which are `defer`red, so they run after this module) look for it.
+FIREBASE_SHIM = """<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+  import {
+    getFirestore, doc, getDoc, setDoc, onSnapshot
+  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+  window.firebaseSDK = {
+    initializeApp: initializeApp,
+    firestore: { getFirestore, doc, getDoc, setDoc, onSnapshot }
+  };
+</script>"""
+
+
 PUBLIC_HEAD = f"""<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>উত্তরবঙ্গ হেরিটেজ ফেস্ট | Uttarbanga Heritage Fest</title>
@@ -226,7 +248,9 @@ README.md
 def page(head: str, body: str, scripts: list[str], vendor: str = "") -> str:
     tags = "\n".join(f'<script src="./js/{s}" defer></script>' for s in scripts)
     if vendor:
-        # Must execute BEFORE settings.js, which looks for window.supabase.
+        # Must execute BEFORE settings.js, which looks for window.supabase /
+        # window.firebaseSDK. Classic scripts below are deferred, so a module
+        # shim here is guaranteed to have run first.
         tags = vendor + "\n" + tags
     return f"""<!DOCTYPE html>
 <html lang="bn">
@@ -244,7 +268,13 @@ def page(head: str, body: str, scripts: list[str], vendor: str = "") -> str:
 
 
 def main() -> None:
-    vendor = SUPABASE_CDN if supabase_configured() else ""
+    # Firestore takes precedence, matching the backend selection in settings.js.
+    if firebase_configured():
+        vendor = FIREBASE_SHIM
+    elif supabase_configured():
+        vendor = SUPABASE_CDN
+    else:
+        vendor = ""
 
     # ---------------- shared assets, once ----------------
     for sub in ("css", "js", "images"):

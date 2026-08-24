@@ -34,17 +34,26 @@
   var LOCAL_KEY = 'uhf:settings:exam';
   var TABLE = 'settings';
   var ROW_ID = 1;
+  var FS_COLLECTION = 'settings';
+  var FS_DOC = 'examControl';
 
   /*
-   * Shipped defaults = exam OPEN. A visitor who has never had settings pushed
-   * to them (fresh browser, or no Supabase row yet) can sit the exam straight
-   * away. Lock it again from the admin panel by switching the countdown on.
+   * Shipped defaults = exam LOCKED. This is a security boundary, not a
+   * preference.
    *
-   * examStartDate is only consulted while timerEnabled is true; it is kept so
-   * the organiser has a sensible value pre-filled in the date picker.
+   * The old defaults were the opposite (timerEnabled:false + offBehavior:'live'
+   * => 'live'), which meant any visitor the settings had never reached — a
+   * fresh browser, a phone, a new device, a backend that was down, a fetch that
+   * failed — was shown an OPEN exam. The lock only ever existed in the one
+   * browser that had written to localStorage.
+   *
+   * isUnlocked is now the single authoritative gate and it FAILS CLOSED:
+   * nothing short of a backend explicitly answering `true` opens the exam.
+   * Loading, offline, no row, parse error, junk value -> locked.
    */
   var DEFAULTS = {
-    timerEnabled: false,
+    isUnlocked: false,
+    timerEnabled: true,
     examStartDate: '2026-09-25T00:00:00' + TZ,
     offBehavior: 'live',
     customMessage: '',
@@ -60,6 +69,9 @@
       ? s.examStartDate
       : DEFAULTS.examStartDate;
     return {
+      // Strict identity check, deliberately. 'true', 1, {} and undefined are
+      // all NOT an unlock. Only a real boolean true opens the exam.
+      isUnlocked: s.isUnlocked === true,
       timerEnabled: typeof s.timerEnabled === 'boolean' ? s.timerEnabled : DEFAULTS.timerEnabled,
       examStartDate: date,
       offBehavior: s.offBehavior === 'message' ? 'message' : 'live',
@@ -145,8 +157,15 @@
    */
   function examStatus(s) {
     var n = normalise(s);
-    if (!n.timerEnabled) return n.offBehavior === 'message' ? 'closed' : 'live';
-    return new Date() < new Date(n.examStartDate) ? 'countdown' : 'live';
+
+    // The gate. Locked unless the backend said true, full stop. Note what is
+    // NOT here any more: the exam no longer opens itself just because
+    // examStartDate slipped past. A date passing is not consent — the
+    // organiser flips the switch.
+    if (n.isUnlocked !== true) {
+      return (!n.timerEnabled && n.offBehavior === 'message') ? 'closed' : 'countdown';
+    }
+    return 'live';
   }
 
   // -------------------------------------------------------- local backend
@@ -180,6 +199,85 @@
       return function () { window.removeEventListener('storage', onStorage); };
     }
   };
+
+  // ---------------------------------------------------- firestore backend
+
+  /*
+   * Firestore backend — collection `settings`, document `examControl`.
+   *
+   *     { isUnlocked: boolean, targetDate: '2026-09-25T00:00:00' }
+   *
+   * targetDate is stored WITHOUT an offset, as specified. Bangladesh has no
+   * DST, so we append the fixed +06:00 on read to get an unambiguous instant;
+   * a bare string would otherwise be parsed in the visitor's own timezone and
+   * the countdown would read differently in Dhaka and London.
+   *
+   * The extra fields (offBehavior, customMessage…) ride along in the same
+   * document so the organiser's existing message feature keeps working.
+   */
+  function makeFirestoreBackend(db, fs) {
+    var ref = fs.doc(db, FS_COLLECTION, FS_DOC);
+
+    function fromDoc(data) {
+      if (!data) return normalise(null);   // no document yet -> LOCKED
+      var iso = DEFAULTS.examStartDate;
+      if (typeof data.targetDate === 'string' && data.targetDate) {
+        // Accept both '…T00:00:00' and a full '…+06:00' form.
+        var raw = /[+-]\d{2}:\d{2}$|Z$/.test(data.targetDate)
+          ? data.targetDate
+          : data.targetDate + TZ;
+        if (!isNaN(Date.parse(raw))) iso = raw;
+      }
+      return normalise({
+        isUnlocked: data.isUnlocked,
+        timerEnabled: typeof data.timerEnabled === 'boolean' ? data.timerEnabled : true,
+        examStartDate: iso,
+        offBehavior: data.offBehavior,
+        customMessage: data.customMessage,
+        customMessageEn: data.customMessageEn
+      });
+    }
+
+    function toDoc(next) {
+      return {
+        isUnlocked: next.isUnlocked === true,
+        // Write back in the documented shape: local wall clock, no offset.
+        targetDate: toDhakaInput(next.examStartDate) + ':00',
+        timerEnabled: next.timerEnabled,
+        offBehavior: next.offBehavior,
+        customMessage: next.customMessage,
+        customMessageEn: next.customMessageEn,
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    return {
+      name: 'firestore',
+      remote: true,
+
+      load: function () {
+        return fs.getDoc(ref).then(function (snap) {
+          return fromDoc(snap.exists() ? snap.data() : null);
+        });
+      },
+
+      save: function (next) {
+        return fs.setDoc(ref, toDoc(next), { merge: true }).then(function () { return next; });
+      },
+
+      subscribe: function (cb) {
+        // onSnapshot: the admin flips the switch, every open browser follows
+        // within a second. No polling, no refresh.
+        return fs.onSnapshot(ref, function (snap) {
+          cb(fromDoc(snap.exists() ? snap.data() : null));
+        }, function (err) {
+          // Permission denied / offline. Stay with the last known value, which
+          // defaults to LOCKED — never silently open the exam.
+          console.error('[settings] firestore listener error', err);
+        });
+      }
+    };
+  }
 
   // ----------------------------------------------------- supabase backend
 
@@ -240,7 +338,23 @@
   var backend = localBackend;
   var supabaseClient = null;
 
-  if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
+  var fb = cfg.FIREBASE || {};
+  if (fb.projectId && fb.apiKey) {
+    // The modular SDK is exposed as window.firebaseSDK by the loader shim that
+    // build.py injects before this file.
+    if (window.firebaseSDK && window.firebaseSDK.firestore) {
+      try {
+        var sdk = window.firebaseSDK;
+        var app = sdk.initializeApp(fb);
+        backend = makeFirestoreBackend(sdk.firestore.getFirestore(app), sdk.firestore);
+      } catch (e) {
+        console.error('[settings] Firebase init failed; staying LOCKED on the local fallback.', e);
+      }
+    } else {
+      console.warn('[settings] FIREBASE is configured but the Firebase SDK did not load. ' +
+        'Falling back to localStorage — the exam stays LOCKED for safety.');
+    }
+  } else if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
     // The SDK is loaded from a CDN by a <script> tag before this file. If that
     // request failed (offline, blocked, sandboxed preview) we degrade instead
     // of throwing, and the admin UI reports which backend actually won.
@@ -282,13 +396,18 @@
      * which callers MUST invoke on teardown or the poll timer leaks.
      */
     subscribe: function (cb) {
-      var stop = backend.subscribe(cb);
-      var interval = cfg.POLL_INTERVAL_MS || 60000;
-      pollTimer = setInterval(function () {
-        api.load().then(function (s) {
-          if (JSON.stringify(s) !== JSON.stringify(cached)) cb(s);
-        }).catch(function () { /* transient; try again next tick */ });
-      }, interval);
+      var stop = backend.subscribe(function (s) { cached = s; cb(s); });
+
+      // Firestore's onSnapshot is authoritative and already reconnects itself.
+      // Polling on top of it would just bill reads for answers we have.
+      if (backend.name !== 'firestore') {
+        var interval = cfg.POLL_INTERVAL_MS || 60000;
+        pollTimer = setInterval(function () {
+          api.load().then(function (s) {
+            if (JSON.stringify(s) !== JSON.stringify(cached)) cb(s);
+          }).catch(function () { /* transient; try again next tick */ });
+        }, interval);
+      }
       return function () {
         stop();
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }

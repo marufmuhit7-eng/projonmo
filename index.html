@@ -196,7 +196,11 @@
     <div class="eyebrow"><span class="bn">প্রিলিমিনারি রাউন্ড</span><span class="en">Preliminary Round</span></div>
     <h2 style="margin-top:0;"><span class="bn">অনলাইন পরীক্ষা</span><span class="en">Online Exam</span></h2>
 
-    <div id="examLocked" class="form-box hidden">
+    <!-- Starts VISIBLE and the login box starts hidden: the page must paint
+         locked before any JavaScript runs, so a slow network or a blocked
+         script can never reveal the exam. Only an explicit isUnlocked===true
+         from the backend opens it. -->
+    <div id="examLocked" class="form-box">
       <h3 class="bn" style="margin-top:0;">⏳ পরীক্ষা এখনো শুরু হয়নি</h3>
       <h3 class="en" style="margin-top:0;">⏳ The exam hasn't started yet</h3>
       <p class="bn" id="examLockedTextBn"></p>

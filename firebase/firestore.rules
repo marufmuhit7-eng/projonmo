@@ -1,0 +1,55 @@
+rules_version = '2';
+
+// =====================================================================
+//  Uttarbanga Heritage Fest — Firestore security rules
+//
+//  Paste into Firebase Console -> Firestore Database -> Rules -> Publish.
+//
+//  THIS FILE IS THE LOCK. The `isUnlocked` field in the app is only a
+//  display gate; what actually stops a visitor from opening the exam for
+//  everyone is the write rule below. Publish these rules before the event.
+// =====================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // The exam control document: settings/examControl
+    //   { isUnlocked: false, targetDate: "2026-09-25T00:00:00" }
+    match /settings/examControl {
+
+      // Anyone may READ. Every visitor needs this to know whether the exam
+      // is open, and reading "the exam is locked" leaks nothing.
+      allow read: if true;
+
+      // Only a signed-in organiser may WRITE, and only a well-formed
+      // document. An anonymous visitor holding the same public apiKey
+      // cannot flip the switch, because they have no auth token.
+      allow write: if request.auth != null
+                   && request.resource.data.isUnlocked is bool
+                   && request.resource.data.targetDate is string;
+    }
+
+    // Everything else is closed. Add rules deliberately, never by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// =====================================================================
+//  AFTER PUBLISHING
+//
+//  a) Authentication -> Sign-in method -> enable Email/Password.
+//  b) Authentication -> Users -> "Add user": create ONE organiser account.
+//     That account, not a constant in JavaScript, is what guards the exam.
+//  c) Do NOT enable public sign-up. If anyone can create an account, anyone
+//     can satisfy `request.auth != null` and unlock the exam.
+//
+//  Verify the rules do what you think, in the Rules Playground:
+//
+//    read  /settings/examControl  unauthenticated  -> ALLOW
+//    write /settings/examControl  unauthenticated  -> DENY   <- must deny
+//    write /settings/examControl  authenticated    -> ALLOW
+//
+//  If that middle case is allowed, stop and fix it before the event.
+// =====================================================================

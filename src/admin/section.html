@@ -88,6 +88,28 @@
             </div>
           </div>
 
+          <!-- ============ MASTER GATE: isUnlocked ============ -->
+          <!-- This is the switch that actually opens the exam for everyone.
+               It saves on flip, by itself, so there is no way to think you
+               unlocked the exam and walk away without pressing Save. -->
+          <div style="border:2px solid var(--clay);border-radius:3px;padding:18px 20px;margin-bottom:26px;background:rgba(255,255,255,0.6);">
+            <div style="display:flex;align-items:center;gap:14px;">
+              <label class="switch" for="examUnlockedInput" aria-label="Unlock the exam for everyone">
+                <input type="checkbox" id="examUnlockedInput">
+                <span class="switch-track"><span class="switch-thumb"></span></span>
+              </label>
+              <label for="examUnlockedInput" style="cursor:pointer;margin:0;font-weight:400;">
+                <span class="bn"><strong>পরীক্ষা সবার জন্য চালু করো (মাস্টার সুইচ)</strong> — চালু করলেই সব ব্রাউজারে সঙ্গে সঙ্গে পরীক্ষা খুলে যাবে। বন্ধ থাকলে সবাই কাউন্টডাউন দেখবে।</span>
+                <span class="en"><strong>Unlock the exam for everyone (master switch)</strong> — flipping this opens the exam in every browser instantly. While off, everyone sees the countdown.</span>
+              </label>
+            </div>
+            <div id="examUnlockedMsg" style="margin-top:10px;"></div>
+            <div class="small-note" style="margin-top:8px;">
+              <span class="bn">🔒 ডিফল্ট অবস্থা <strong>লকড</strong>। ডেটাবেস স্পষ্টভাবে <code>isUnlocked: true</code> না বললে কোনো ব্রাউজারেই প্রশ্ন দেখা যাবে না।</span>
+              <span class="en">🔒 The default is <strong>locked</strong>. Unless the database explicitly says <code>isUnlocked: true</code>, no browser shows the questions.</span>
+            </div>
+          </div>
+
           <!-- ON / OFF -->
           <div style="display:flex;align-items:center;gap:14px;">
             <label class="switch" for="timerEnabledInput" aria-label="Show the countdown timer">

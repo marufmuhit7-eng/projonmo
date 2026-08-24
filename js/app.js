@@ -55,16 +55,22 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
 /* ---------- Exam ---------- */
 
 /*
- * The exam gate is driven entirely by window.examSettings, which the organiser
- * controls from the admin panel:
+ * The exam gate. It FAILS CLOSED: locked is the default and the only way out
+ * is a backend explicitly answering isUnlocked === true.
  *
- *   timerEnabled = true   -> countdown runs to examStartDate, then the exam opens
- *   timerEnabled = false  -> countdown box is hidden completely, and then
- *                            offBehavior 'live'    -> the exam is open right now
- *                            offBehavior 'message' -> show the organiser's message
+ *   isUnlocked === true   -> exam is open
+ *   anything else         -> locked; countdown to examStartDate, or the
+ *                            organiser's message when offBehavior is 'message'
  *
- * examStartDate is dynamic; the old hardcoded 25 Sep 2026 constant is gone and
- * now only survives as the default inside settings.js.
+ * "Anything else" is doing real work: it covers a fresh browser, a phone that
+ * has never seen the admin panel, a failed fetch, an offline visitor, a
+ * missing Firestore document and a malformed value. Previously every one of
+ * those showed an OPEN exam, because the lock lived only in the admin's own
+ * localStorage. That was the bug.
+ *
+ * Note the page starts locked in the DOM too (examLocked is visible, the login
+ * box is hidden), so there is no window between first paint and the first
+ * backend answer where questions could leak.
  */
 
 let countdownInterval = null;
@@ -84,9 +90,8 @@ async function checkExamAvailability(){
   try{
     examSettings = await window.examSettings.load();
   }catch(err){
-    // Never leave the student staring at a blank page because a fetch failed —
-    // fall back to whatever we last knew, or the defaults.
-    console.error('exam settings unavailable, using last known values', err);
+    // A failed fetch must never open the exam. current() defaults to LOCKED.
+    console.error('exam settings unavailable — staying locked', err);
     examSettings = window.examSettings.current();
   }
   renderExamGate(examSettings);
@@ -96,6 +101,7 @@ async function checkExamAvailability(){
 function renderExamGate(s){
   const lockedBox   = document.getElementById('examLocked');
   const loginBox    = document.getElementById('examLogin');
+  const examBody    = document.getElementById('examBody');
   const countdownEl = document.getElementById('countdownBox');
   const lockedBn    = document.getElementById('examLockedTextBn');
   const lockedEn    = document.getElementById('examLockedTextEn');
@@ -103,19 +109,25 @@ function renderExamGate(s){
 
   stopCountdown();
 
-  // ---- timer switched OFF by the organiser --------------------------------
-  if(!s.timerEnabled){
+  // ---- UNLOCKED: the one and only open path -------------------------------
+  if(s.isUnlocked === true){
     countdownEl.classList.add('hidden');
+    lockedBox.classList.add('hidden');
+    // Don't yank a candidate out of an exam they are already sitting.
+    if(examBody.classList.contains('hidden')) loginBox.classList.remove('hidden');
+    return;
+  }
 
-    if(s.offBehavior === 'live'){
-      lockedBox.classList.add('hidden');
-      loginBox.classList.remove('hidden');
-      return;
-    }
+  // ---- LOCKED (everything else) -------------------------------------------
+  // An in-progress attempt is torn down: if the organiser locks mid-exam, the
+  // questions must disappear from every screen, not just new visitors'.
+  loginBox.classList.add('hidden');
+  examBody.classList.add('hidden');
+  lockedBox.classList.remove('hidden');
 
-    // custom message
-    lockedBox.classList.remove('hidden');
-    loginBox.classList.add('hidden');
+  // Organiser chose a message instead of a countdown.
+  if(!s.timerEnabled && s.offBehavior === 'message'){
+    countdownEl.classList.add('hidden');
     if(heading[0]) heading[0].textContent = '📢 ঘোষণা';
     if(heading[1]) heading[1].textContent = '📢 Notice';
     lockedBn.textContent = s.customMessage || 'পরীক্ষা আপাতত বন্ধ আছে।';
@@ -123,15 +135,13 @@ function renderExamGate(s){
     return;
   }
 
-  // ---- timer ON -----------------------------------------------------------
+  // Default locked view: the Bengali countdown.
   countdownEl.classList.remove('hidden');
   if(heading[0]) heading[0].textContent = '⏳ পরীক্ষা এখনো শুরু হয়নি';
   if(heading[1]) heading[1].textContent = "⏳ The exam hasn't started yet";
 
   const startAt = new Date(s.examStartDate);
   if(new Date() < startAt){
-    lockedBox.classList.remove('hidden');
-    loginBox.classList.add('hidden');
     lockedBn.textContent =
       window.examSettings.formatBnDateTime(s.examStartDate) +
       ' তারিখ থেকে পরীক্ষা শুরু হবে। এই সময়ের আগে পরীক্ষায় অংশ নেওয়া যাবে না। নিচে কতক্ষণ বাকি তা দেখা যাচ্ছে:';
@@ -141,8 +151,12 @@ function renderExamGate(s){
     tickCountdown();
     countdownInterval = setInterval(tickCountdown, 1000);
   }else{
-    lockedBox.classList.add('hidden');
-    loginBox.classList.remove('hidden');
+    // The date has passed but the organiser has not unlocked. The countdown is
+    // spent, so show zeros and say plainly that it opens shortly — do NOT let
+    // a passing timestamp unlock the exam by itself.
+    countdownEl.classList.add('hidden');
+    lockedBn.textContent = 'পরীক্ষা শীঘ্রই শুরু হবে। আয়োজকরা পরীক্ষা চালু করলেই এই পাতা নিজে থেকে আপডেট হয়ে যাবে — পাতা রিফ্রেশ করার দরকার নেই।';
+    lockedEn.textContent = 'The exam will begin shortly. This page updates by itself the moment the organisers open it — no need to refresh.';
   }
 }
 
@@ -203,10 +217,7 @@ async function startExam(){
   // Re-check the live setting: the organiser may have opened or closed the exam
   // since this page was loaded.
   const gate = examSettings || window.examSettings.current();
-  const stillLocked = gate.timerEnabled
-    ? new Date() < new Date(gate.examStartDate)
-    : gate.offBehavior === 'message';
-  if(stillLocked){
+  if(gate.isUnlocked !== true){
     checkExamAvailability();
     return;
   }
