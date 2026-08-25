@@ -28,13 +28,30 @@ SRC = ROOT / "src"
 
 LOGO = "heritage-fest-logo-708214d0.jpg"
 
+# Typography. Bengali is the primary script here, so it gets a proper pairing
+# rather than one family doing every job:
+#
+#   Noto Serif Bengali  — headings. Contrast and stroke modulation that reads as
+#                         heritage without tipping into decorative.
+#   Noto Sans Bengali   — body. Open counters and a tall x-height, which is what
+#                         keeps দীর্ঘ যুক্তাক্ষর legible at 16px on a phone.
+#   Playfair Display    — English headings, matched to the Bengali serif.
+#   Source Sans 3       — English body, matched to the Bengali sans.
+#
+# Hind Siliguri is gone. Tiro Bangla is kept as a Bengali display FALLBACK only:
+# it has no weight axis, so it cannot render the 600/700 the headings ask for.
+#
+# Weights are requested explicitly. Asking for a weight Google does not serve
+# means the browser synthesises a fake bold, which on Bengali conjuncts smears
+# the joins — the usual cause of "the Bangla looks muddy" on a heritage site.
 FONTS = (
     '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-    '<link href="https://fonts.googleapis.com/css2?family=Tiro+Bangla:ital@0;1'
-    "&family=Hind+Siliguri:wght@400;500;600;700"
-    "&family=Spectral:ital,wght@0,400;0,600;0,700;1,400"
-    "&family=Inter:wght@400;500;600;700"
+    '<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@500;600;700'
+    "&family=Noto+Sans+Bengali:wght@400;500;600;700"
+    "&family=Tiro+Bangla:ital@0;1"
+    "&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400;1,600"
+    "&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400"
     '&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">'
 )
 
