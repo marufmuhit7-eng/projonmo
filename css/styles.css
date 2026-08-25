@@ -359,6 +359,49 @@
   .switch input:checked + .switch-track .switch-thumb{transform:translateX(24px);}
   .switch input:focus-visible + .switch-track{outline:2px solid var(--brass);outline-offset:2px;}
 
+  /* ---- Contact card (info section) ---- */
+  .contact-card{max-width:460px;}
+  .contact-list{list-style:none;margin:0;padding:0;}
+  .contact-list li{
+    display:flex;align-items:flex-start;gap:11px;
+    padding:11px 0;border-bottom:1px solid rgba(142,106,46,0.16);
+  }
+  .contact-list li:last-child{border-bottom:0;padding-bottom:0;}
+  .contact-list li:first-child{padding-top:0;}
+  .contact-ico{flex:0 0 auto;font-size:1.05rem;line-height:1.5;}
+  .contact-list a{
+    color:var(--ink);text-decoration:none;font-weight:600;font-size:0.94rem;
+    border-bottom:1px solid transparent;transition:color .15s,border-color .15s;
+    word-break:break-word;
+  }
+  .contact-list a:hover,.contact-list a:focus-visible{
+    color:var(--maroon);border-bottom-color:var(--gold);
+  }
+  /* Bangla numerals need the mono face to stay evenly spaced. */
+  .contact-num{font-family:var(--f-mono);letter-spacing:.02em;}
+  .contact-handle{
+    display:block;font-family:var(--f-mono);font-size:0.78rem;font-weight:400;
+    color:var(--brass-text);margin-top:2px;
+  }
+
+  /* ---- Social row in the footer ---- */
+  .footer-social{
+    display:flex;justify-content:center;gap:20px;flex-wrap:wrap;
+    margin-top:14px;font-size:0.84rem;
+  }
+  .footer-social a{
+    color:rgba(241,233,216,0.78);text-decoration:none;
+    display:inline-flex;align-items:center;gap:6px;
+    border-bottom:1px solid transparent;padding-bottom:2px;
+    transition:color .15s,border-color .15s;
+  }
+  .footer-social a:hover,.footer-social a:focus-visible{
+    color:var(--cream);border-bottom-color:var(--brass);
+  }
+  @media(max-width:520px){
+    .footer-social{gap:14px;font-size:0.8rem;}
+  }
+
   /* ---- Discreet admin link in the footer ---- */
   .footer-links{margin-top:10px;font-size:0.76rem;}
   .footer-links a{
