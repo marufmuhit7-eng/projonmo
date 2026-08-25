@@ -207,7 +207,34 @@
   .btn-primary:hover{background:var(--clay-dark);}
   .btn-ghost{border:1px solid var(--brass);color:var(--brass);background:transparent;}
   .btn-ghost:hover{background:rgba(169,133,68,0.12);}
-  .temple-silhouette{width:100%;height:150px;display:block;opacity:.42;}
+  /* ---- Heritage panorama (hero footer band) ----------------------
+     Tajhat Palace, Kantajew Temple, Teesta Barrage. Replaces the old
+     abstract silhouettes.
+
+     The illustration has a cream sky along its top edge, so instead of a
+     hard seam a mask fades the first slice into the hero parchment. That
+     is why there is no negative margin here: overlapping with margin-top
+     would slide the artwork under the CTA buttons at narrow widths, where
+     the hero text reflows and grows taller. The fade does the blending,
+     and it holds at every width.                                        */
+  .heritage-landscape-img{
+    display:block;
+    width:100%;
+    height:auto;
+    max-height:350px;
+    object-fit:cover;
+    object-position:bottom;
+    margin-top:-18px;                 /* small tuck; the mask does the rest */
+    position:relative;
+    z-index:1;
+    -webkit-mask-image:linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.55) 9%, #000 22%);
+            mask-image:linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.55) 9%, #000 22%);
+  }
+  @media(max-width:700px){
+    /* Portrait phones: a 4:1 band would shrink the landmarks to specks, so
+       crop tighter and let object-position keep the buildings in frame. */
+    .heritage-landscape-img{height:150px;max-height:150px;margin-top:-10px;}
+  }
 
   /* ---- Cards / grids ---- */
   .grid{display:grid;gap:20px;}
