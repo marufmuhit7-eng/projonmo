@@ -63,14 +63,18 @@ SUPABASE_CDN = '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@
 def supabase_configured() -> bool:
     """True when src/shared/config.js has a non-empty SUPABASE_URL."""
     cfg = (SRC / "shared" / "config.js").read_text(encoding="utf-8")
-    m = re.search(r"SUPABASE_URL:\s*'([^']*)'", cfg)
+    # ^\s* anchors to the start of a line so commented-out examples
+    # ("// SUPABASE_URL: 'https://…'") never count as configuration.
+    m = re.search(r"^\s*SUPABASE_URL:\s*'([^']*)'", cfg, re.MULTILINE)
     return bool(m and m.group(1).strip())
 
 
 def firebase_configured() -> bool:
     """True when src/shared/config.js has a non-empty FIREBASE.projectId."""
     cfg = (SRC / "shared" / "config.js").read_text(encoding="utf-8")
-    m = re.search(r"projectId:\s*'([^']*)'", cfg)
+    # Same line-start anchor: the commented example values in the FIREBASE
+    # block must not make the build believe Firebase is configured.
+    m = re.search(r"^\s*projectId:\s*'([^']*)'", cfg, re.MULTILINE)
     return bool(m and m.group(1).strip())
 
 
@@ -82,9 +86,13 @@ FIREBASE_SHIM = """<script type="module">
   import {
     getFirestore, doc, getDoc, setDoc, onSnapshot
   } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+  import {
+    getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
+  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
   window.firebaseSDK = {
     initializeApp: initializeApp,
-    firestore: { getFirestore, doc, getDoc, setDoc, onSnapshot }
+    firestore: { getFirestore, doc, getDoc, setDoc, onSnapshot },
+    auth: { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut }
   };
 </script>"""
 

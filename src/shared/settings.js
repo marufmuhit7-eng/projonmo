@@ -337,6 +337,8 @@
 
   var backend = localBackend;
   var supabaseClient = null;
+  var firebaseAuth = null;   // Firebase Auth instance, when Firestore won
+  var fsAuthMod = null;      // the firebase-auth module itself
 
   var fb = cfg.FIREBASE || {};
   if (fb.projectId && fb.apiKey) {
@@ -347,6 +349,13 @@
         var sdk = window.firebaseSDK;
         var app = sdk.initializeApp(fb);
         backend = makeFirestoreBackend(sdk.firestore.getFirestore(app), sdk.firestore);
+        // Writes to Firestore must satisfy `request.auth != null` in the
+        // published rules, so expose Email/Password auth for the admin panel's
+        // cloud sign-in box. Visitors never sign in; they only read.
+        if (sdk.auth && sdk.auth.getAuth) {
+          fsAuthMod = sdk.auth;
+          firebaseAuth = sdk.auth.getAuth(app);
+        }
       } catch (e) {
         console.error('[settings] Firebase init failed; staying LOCKED on the local fallback.', e);
       }
@@ -414,10 +423,21 @@
       };
     },
 
-    // --- organiser auth (Supabase only) ---------------------------------
+    // --- organiser auth (Firebase or Supabase — whichever backend won) ----
+    // The Firestore rules demand a signed-in organiser for writes; the admin
+    // panel signs in through these before flipping the master switch.
     auth: {
-      available: function () { return !!supabaseClient; },
+      available: function () { return !!firebaseAuth || !!supabaseClient; },
+      provider: function () {
+        if (firebaseAuth) return 'firebase';
+        if (supabaseClient) return 'supabase';
+        return null;
+      },
       signIn: function (email, password) {
+        if (firebaseAuth) {
+          return fsAuthMod.signInWithEmailAndPassword(firebaseAuth, email, password)
+            .then(function (cred) { return cred.user; });
+        }
         if (!supabaseClient) return Promise.reject(new Error('no remote backend configured'));
         return supabaseClient.auth.signInWithPassword({ email: email, password: password })
           .then(function (res) {
@@ -426,14 +446,35 @@
           });
       },
       signOut: function () {
+        if (firebaseAuth) return fsAuthMod.signOut(firebaseAuth);
         if (!supabaseClient) return Promise.resolve();
         return supabaseClient.auth.signOut();
       },
       currentUser: function () {
+        if (firebaseAuth) {
+          // onAuthStateChanged fires exactly once with the current user (or
+          // null) — the "get session" primitive the modular SDK lacks.
+          return new Promise(function (resolve) {
+            var stop = fsAuthMod.onAuthStateChanged(firebaseAuth, function (user) {
+              stop();
+              resolve(user);
+            });
+          });
+        }
         if (!supabaseClient) return Promise.resolve(null);
         return supabaseClient.auth.getSession().then(function (res) {
           return res.data && res.data.session ? res.data.session.user : null;
         });
+      },
+      /** Live listener for the admin UI. Returns an unsubscribe function. */
+      onAuthChange: function (cb) {
+        if (firebaseAuth) return fsAuthMod.onAuthStateChanged(firebaseAuth, cb);
+        if (supabaseClient && supabaseClient.auth.onAuthStateChange) {
+          return supabaseClient.auth.onAuthStateChange(function (_ev, session) {
+            cb(session ? session.user : null);
+          });
+        }
+        return function () {};
       }
     },
 
