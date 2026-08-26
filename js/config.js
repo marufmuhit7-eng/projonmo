@@ -30,20 +30,12 @@ window.APP_CONFIG = {
    * examControl, only a signed-in organiser may write it.
    */
   FIREBASE: {
-    // Firebase Console → Project settings → General → "Your apps" →
-    // SDK setup and configuration → Config. Example shape:
-    //   apiKey:            'AIzaSyD-EXAMPLE-xxxxxxxxxxxxxxxxxxxx',
-    //   authDomain:        'your-project.firebaseapp.com',
-    //   projectId:         'your-project',
-    //   storageBucket:     'your-project.appspot.com',   // or .firebasestorage.app
-    //   messagingSenderId: '000000000000',
-    //   appId:             '1:000000000000:web:abcdef1234567890',
-    apiKey: '',
-    authDomain: '',
-    projectId: '',
-    storageBucket: '',
-    messagingSenderId: '',
-    appId: ''
+    apiKey: 'AIzaSyAHTTwLzPOEEvBw-Nn3rZ5THvkpn1ezwc8',
+    authDomain: 'uttarbanga-heritage-fest.firebaseapp.com',
+    projectId: 'uttarbanga-heritage-fest',
+    storageBucket: 'uttarbanga-heritage-fest.firebasestorage.app',
+    messagingSenderId: '357374069447',
+    appId: '1:357374069447:web:303b707039eee008dacce2'
   },
 
   // e.g. 'https://abcdefghijklm.supabase.co'  — leave '' to stay on localStorage
