@@ -26,7 +26,7 @@ import shutil
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"
 
-LOGO = "heritage-fest-logo-708214d0.jpg"
+LOGO = "logo.png"
 
 # Typography. Bengali is the primary script here, so it gets a proper pairing
 # rather than one family doing every job:
@@ -119,7 +119,7 @@ ADMIN_HEAD = f"""<meta charset="UTF-8">
 ADMIN_NAV = f"""<nav class="topnav">
   <div class="nav-inner">
     <div class="brand">
-      <img src="./images/{LOGO}" alt="" style="width:38px;height:38px;border-radius:50%;object-fit:cover;object-position:50% 42%;border:2px solid var(--brass);box-shadow:0 0 0 2px var(--indigo-deep);flex:0 0 auto;">
+      <img src="./images/{LOGO}" alt="" style="width:38px;height:38px;border-radius:50%;object-fit:contain;background:radial-gradient(circle at 50% 40%,#FBF3DF 0%,#EBDCBB 100%);border:2px solid var(--brass);box-shadow:0 0 0 2px var(--indigo-deep);flex:0 0 auto;">
       <span class="bn">হেরিটেজ ফেস্ট — এডমিন</span><span class="en">Heritage Fest — Admin</span>
     </div>
     <button class="lang-toggle" id="langToggle">EN / বাং</button>
@@ -141,7 +141,7 @@ NOT_FOUND = f"""<!DOCTYPE html>
 </head>
 <body class="lang-bn" style="display:flex;flex-direction:column;min-height:100vh;">
 <main class="wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 24px;">
-  <img src="/images/{LOGO}" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;object-position:50% 42%;border:2px solid var(--brass);box-shadow:0 0 0 3px var(--indigo-deep);">
+  <img src="/images/{LOGO}" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:contain;background:radial-gradient(circle at 50% 40%,#FBF3DF 0%,#EBDCBB 100%);border:2px solid var(--brass);box-shadow:0 0 0 3px var(--indigo-deep);">
   <div style="font-family:var(--f-mono);font-size:3.2rem;font-weight:700;color:var(--clay);margin:22px 0 6px;">৪০৪</div>
   <h1 style="margin:0 0 14px;font-size:1.5rem;">
     <span class="bn">এই পাতাটি খুঁজে পাওয়া যায়নি</span><span class="en">This page could not be found</span>
