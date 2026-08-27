@@ -30,6 +30,26 @@
     </div>
 
     <div id="adminPanel" class="hidden">
+      <!-- ☁️ Organiser sign-in: appears only when Supabase is configured.
+           Privileged writes (questions, timer, master switch) are allowed by
+           the database only for a signed-in organiser. -->
+      <div id="cloudAuthBox" class="hidden" style="border:1px dashed var(--gold);border-radius:3px;padding:14px 18px;margin-bottom:22px;background:rgba(255,255,255,0.55);">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="font-weight:700;">
+            <span class="bn">☁️ আয়োজক সাইন-ইন (Supabase)</span>
+            <span class="en">☁️ Organiser sign-in (Supabase)</span>
+          </div>
+          <span id="cloudAuthEmail" class="small-note" style="margin:0;font-family:var(--f-mono);"></span>
+          <button class="btn btn-ghost" id="cloudAuthSignOutBtn" onclick="cloudSignOut()" style="padding:6px 14px;" hidden><span class="bn">সাইন-আউট</span><span class="en">Sign out</span></button>
+        </div>
+        <div id="cloudAuthSignedOut" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+          <input type="email" id="cloudAuthEmailInput" placeholder="organiser@example.com" autocomplete="username" style="flex:1;min-width:180px;font-family:var(--f-mono);padding:10px;">
+          <input type="password" id="cloudAuthPassInput" placeholder="••••••••" autocomplete="current-password" style="flex:1;min-width:140px;font-family:var(--f-mono);padding:10px;">
+          <button class="btn btn-primary" onclick="cloudSignIn()" style="white-space:nowrap;"><span class="bn">সাইন-ইন</span><span class="en">Sign in</span></button>
+        </div>
+        <div id="cloudAuthMsg" style="margin-top:8px;"></div>
+      </div>
+
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
         <div class="tabs">
           <button class="tab-btn admin-sub-btn active" data-sub="questions" onclick="switchAdminSub('questions')"><span class="bn">প্রশ্ন ম্যানেজমেন্ট</span><span class="en">Questions</span></button>
@@ -186,6 +206,7 @@
           <p class="bn" style="margin:0;color:rgba(36,28,21,0.7);">সব রেজিস্ট্রেশনের তালিকা — এই তথ্য শুধু তুমিই দেখতে পাচ্ছ।</p>
           <button class="btn btn-ghost" onclick="loadAdminRegistrations()"><span class="bn">রিফ্রেশ করো</span><span class="en">Refresh</span></button>
         </div>
+        <div id="regsSourceNote" class="small-note" style="margin:-6px 0 14px;"></div>
         <div style="overflow-x:auto;">
           <table class="lb">
             <thead><tr>

@@ -21,6 +21,7 @@ function enterAdminDashboard(){
   document.getElementById('adminPassInput').value = '';
   document.getElementById('adminLoginMsg').innerHTML = '';
   renderAdminIdentity();
+  renderCloudAuth();
   const active = document.querySelector('.admin-sub-btn.active');
   switchAdminSub(active ? active.dataset.sub : 'questions');
 }
@@ -311,13 +312,77 @@ async function onExamUnlockedToggled(){
   }catch(err){
     console.error(err);
     box.checked = !wanted;   // never lie about the real state
-    msg.innerHTML = '<div class="msg err"><span class="bn">সংরক্ষণ ব্যর্থ, অবস্থা বদলায়নি: ' + err.message +
-      '</span><span class="en">Save failed, nothing changed: ' + err.message + '</span></div>';
+    const denied = /row-level security|jwt|auth/i.test(err.message || '');
+    msg.innerHTML = '<div class="msg err"><span class="bn">' + (denied
+      ? '🔒 ডেটাবেস লেখার অনুমতি নেই — উপরের <strong>☁️ আয়োজক সাইন-ইন</strong> বক্সে সাইন-ইন করো।'
+      : 'সংরক্ষণ ব্যর্থ, অবস্থা বদলায়নি: ' + err.message) +
+      '</span><span class="en">' + (denied
+      ? '🔒 The database refused the write — sign in via the <strong>☁️ Organiser sign-in</strong> box above.'
+      : 'Save failed, nothing changed: ' + err.message) + '</span></div>';
   }finally{
     box.disabled = false;
   }
 }
 document.getElementById('examUnlockedInput').addEventListener('change', onExamUnlockedToggled);
+
+/* =========================================================================
+   ☁️ ORGANISER SIGN-IN (Supabase). Privileged writes — questions, timer
+   settings, the master switch — are allowed by the database only for a
+   signed-in organiser. The box appears once SUPABASE_URL is configured and
+   the session persists on this browser, so this is a once-per-device step.
+   ========================================================================= */
+function renderCloudAuth(){
+  const box = document.getElementById('cloudAuthBox');
+  if(!box) return;
+  const auth = window.examSettings.auth;
+  const remote = window.examSettings.isRemote && auth.available();
+  if(!remote){
+    box.classList.add('hidden');
+    return;
+  }
+  box.classList.remove('hidden');
+  auth.currentUser().then(function(user){
+    const out = document.getElementById('cloudAuthSignedOut');
+    const email = document.getElementById('cloudAuthEmail');
+    const outBtn = document.getElementById('cloudAuthSignOutBtn');
+    if(user){
+      out.style.display = 'none';
+      email.textContent = '✅ ' + (user.email || user.id);
+      outBtn.hidden = false;
+    }else{
+      out.style.display = 'flex';
+      email.textContent = '';
+      outBtn.hidden = true;
+    }
+  }).catch(function(){ /* stay on the signed-out view */ });
+}
+
+async function cloudSignIn(){
+  const msg = document.getElementById('cloudAuthMsg');
+  const email = document.getElementById('cloudAuthEmailInput').value.trim();
+  const pass = document.getElementById('cloudAuthPassInput').value;
+  if(!email || !pass){
+    msg.innerHTML = '<div class="msg err"><span class="bn">ইমেইল ও পাসওয়ার্ড দাও।</span><span class="en">Enter the email and password.</span></div>';
+    return;
+  }
+  msg.innerHTML = '<div class="small-note"><span class="bn">সাইন-ইন হচ্ছে…</span><span class="en">Signing in…</span></div>';
+  try{
+    await window.examSettings.auth.signIn(email, pass);
+    document.getElementById('cloudAuthPassInput').value = '';
+    msg.innerHTML = '<div class="msg ok"><span class="bn">✅ সাইন-ইন সম্পন্ন — প্রশ্ন, টাইমার ও মাস্টার সুইচের পরিবর্তন এখন সবার জন্য সেভ হবে।</span><span class="en">✅ Signed in — question, timer and master-switch changes now save for everyone.</span></div>';
+    renderCloudAuth();
+  }catch(err){
+    console.error(err);
+    msg.innerHTML = '<div class="msg err"><span class="bn">সাইন-ইন ব্যর্থ: ' + err.message +
+      '</span><span class="en">Sign-in failed: ' + err.message + '</span></div>';
+  }
+}
+
+async function cloudSignOut(){
+  await window.examSettings.auth.signOut().catch(function(){});
+  document.getElementById('cloudAuthMsg').innerHTML = '';
+  renderCloudAuth();
+}
 
 /* Keep the message fields in step with the two controls that govern them. */
 document.getElementById('timerOffBehaviorInput').addEventListener('change', syncTimerMessageVisibility);
@@ -365,12 +430,29 @@ async function saveAdminQuestions(){
     await window.storage.set('questions:'+cat, JSON.stringify(parsed), true);
     msg.innerHTML = '<div class="msg ok"><span class="bn">প্রশ্ন সংরক্ষণ হয়েছে!</span><span class="en">Questions saved!</span></div>';
   }catch(err){
-    msg.innerHTML = '<div class="msg err"><span class="bn">সংরক্ষণ ব্যর্থ হয়েছে।</span><span class="en">Save failed.</span></div>';
+    console.error(err);
+    const denied = /row-level security|jwt|auth/i.test(err.message || '');
+    msg.innerHTML = '<div class="msg err"><span class="bn">' + (denied
+      ? '🔒 ডেটাবেস লেখার অনুমতি নেই — উপরের <strong>☁️ আয়োজক সাইন-ইন</strong> বক্সে সাইন-ইন করো।'
+      : 'সংরক্ষণ ব্যর্থ হয়েছে।') +
+      '</span><span class="en">' + (denied
+      ? '🔒 The database refused the write — sign in via the <strong>☁️ Organiser sign-in</strong> box above.'
+      : 'Save failed.') + '</span></div>';
   }
 }
 
 async function loadAdminRegistrations(){
   const body = document.getElementById('adminRegsBody');
+  const note = document.getElementById('regsSourceNote');
+  if(note){
+    if(window.storage.backend === 'supabase'){
+      note.innerHTML = '<span class="bn">✅ শেয়ার্ড ডেটাবেস (Supabase) — যেকোনো ডিভাইস থেকে করা রেজিস্ট্রেশন এখানে আসছে।</span><span class="en">✅ Shared database (Supabase) — registrations from every device land here.</span>';
+      note.style.color = 'var(--sage)';
+    }else{
+      note.innerHTML = '<span class="bn">⚠️ এখন <strong>localStorage</strong> চালু — শুধু <strong>এই ব্রাউজারে</strong> হওয়া রেজিস্ট্রেশন দেখা যাচ্ছে। অন্য কারো রেজিস্ট্রেশন আসছে না। সবারটা আনতে <code>src/shared/config.js</code>-এ Supabase কনফিগার করো।</span><span class="en">⚠️ Running on <strong>localStorage</strong> — you only see registrations made in <strong>this browser</strong>. Configure Supabase in <code>src/shared/config.js</code> to receive everyone\'s.</span>';
+      note.style.color = 'var(--clay-dark)';
+    }
+  }
   body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;">…</td></tr>';
   try{
     const listRes = await window.storage.list('participant:', true);

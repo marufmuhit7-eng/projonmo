@@ -262,7 +262,10 @@
     // request failed (offline, blocked, sandboxed preview) we degrade instead
     // of throwing, and the admin UI reports which backend actually won.
     if (window.supabase && typeof window.supabase.createClient === 'function') {
-      supabaseClient = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+      // Shared with storage.js (window.__uhfSupabase) so there is exactly one
+      // client, one auth session and one realtime socket per browser.
+      supabaseClient = window.__uhfSupabase ||
+        (window.__uhfSupabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY));
       backend = makeSupabaseBackend(supabaseClient);
     } else {
       console.warn('[settings] SUPABASE_URL is configured but the supabase-js SDK did not load. ' +

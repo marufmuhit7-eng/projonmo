@@ -88,3 +88,73 @@ alter publication supabase_realtime add table public.settings;
 --  If that second command succeeds, your RLS is wrong — stop and fix it
 --  before the event.
 -- =====================================================================
+
+-- =====================================================================
+--  PART 2 — Shared registrations & questions (storage_kv)
+--  storage.js switches to this table automatically once SUPABASE_URL is
+--  set in src/shared/config.js. Keys used by the site:
+--     participant:UHF-XXXXXX  one row per registration (+ score after exam)
+--     questions:<category>    the question sets the admin edits
+-- =====================================================================
+
+-- 6. The table.
+create table if not exists public.storage_kv (
+  key         text        primary key,
+  value       jsonb       not null,
+  updated_at  timestamptz not null default now()
+);
+
+-- 7. Row Level Security.
+alter table public.storage_kv enable row level security;
+
+-- Everyone may READ: participants open the exam with their ID, the public
+-- leaderboard lists scores, and the admin panel reads all registrations.
+drop policy if exists "kv readable by everyone" on public.storage_kv;
+create policy "kv readable by everyone"
+  on public.storage_kv
+  for select
+  to anon, authenticated
+  using (true);
+
+-- Visitors REGISTER anonymously and later save their exam score under their
+-- own 'participant:UHF-…' key. IDs are random (36^6 combinations) and shown
+-- only to the registrant, which is the access boundary for exam continuation.
+drop policy if exists "anyone may register" on public.storage_kv;
+create policy "anyone may register"
+  on public.storage_kv
+  for insert
+  to anon
+  with check (key like 'participant:%');
+
+drop policy if exists "participants may save their exam result" on public.storage_kv;
+create policy "participants may save their exam result"
+  on public.storage_kv
+  for update
+  to anon
+  using (key like 'participant:%')
+  with check (key like 'participant:%');
+
+-- Everything else (questions:…) is writable only by a signed-in organiser:
+-- create that ONE account in Authentication → Users → Add user.
+drop policy if exists "organisers may insert kv" on public.storage_kv;
+create policy "organisers may insert kv"
+  on public.storage_kv
+  for insert
+  to authenticated
+  with check (true);
+
+drop policy if exists "organisers may update kv" on public.storage_kv;
+create policy "organisers may update kv"
+  on public.storage_kv
+  for update
+  to authenticated
+  using (true)
+  with check (true);
+
+-- 8. Least-privilege grants, applied after RLS is on.
+grant select on public.storage_kv to anon, authenticated;
+grant insert, update on public.storage_kv to anon, authenticated;
+
+-- 9. Realtime: the leaderboard and the admin list refresh the moment a
+--    registration or a score lands.
+alter publication supabase_realtime add table public.storage_kv;

@@ -1,34 +1,44 @@
 /*
- * storage.js — browser storage adapter for the Heritage Fest site.
+ * storage.js — storage adapter for the Heritage Fest site.
  *
- * WHY THIS FILE EXISTS
- * --------------------
- * app.js calls `window.storage.get / set / list`. That object was provided by
- * the sandbox the page was originally authored in; it does not exist in a real
- * browser, so on Vercel every button that saves or reads data would throw
- * "Cannot read properties of undefined". This file supplies the same API,
- * backed by window.localStorage, so the deployed site works standalone.
+ * Two modes, picked automatically at load:
  *
- * CONTRACT (matches exactly how app.js uses it)
- * ---------------------------------------------
- *   await storage.set(key, valueString, shared)  -> true on success, throws on failure
- *   await storage.get(key, shared)               -> { value: string }, throws if key absent
- *   await storage.list(prefix, shared)           -> { keys: string[] }
+ *   1. SUPABASE (shared, global) — active when src/shared/config.js has
+ *      SUPABASE_URL and SUPABASE_ANON_KEY filled in. Every set/get/list goes
+ *      to the `storage_kv` table (see supabase/schema.sql), so a registration
+ *      made on ANY phone reaches the admin panel and the leaderboard
+ *      instantly. Writes are mirrored to localStorage as an offline cache.
  *
- * The third `shared` argument is accepted and ignored: localStorage has no
- * notion of a shared namespace. See the SCOPE note below.
+ *   2. LOCAL (fallback) — plain localStorage. Registrations, questions and
+ *      scores then live in ONE browser only: a participant who registers on
+ *      their own phone is invisible to the admin panel on your laptop. This
+ *      is the single-browser mode the site falls back to when nothing is
+ *      configured.
  *
- * SCOPE — READ THIS
- * -----------------
- * localStorage is per-browser and per-device. Registrations made on one phone
- * are NOT visible in the leaderboard or the admin panel on another device.
- * For a real multi-device event, replace the three methods below with calls to
- * a shared backend (see README.md, "Replacing the storage layer").
+ * CONTRACT (matches exactly how app.js / admin.js use it)
+ * ------------------------------------------------------
+ *   await storage.set(key, valueString)  -> true on success, throws on failure
+ *   await storage.get(key)               -> { value: string }, throws if absent
+ *   await storage.list(prefix)           -> { keys: string[] }
+ *
+ *   storage.backend -> 'supabase' | 'local'   (the admin UI shows which won)
  */
 (function () {
   'use strict';
 
-  var PREFIX = 'uhf:'; // namespace so the site never collides with other localStorage keys
+  var PREFIX = 'uhf:'; // localStorage namespace so we never collide with other keys
+  var TABLE = 'storage_kv';
+
+  var cfg = window.APP_CONFIG || {};
+  var client = null;
+
+  if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY &&
+      window.supabase && typeof window.supabase.createClient === 'function') {
+    // One client shared with settings.js, so the organiser's sign-in session
+    // (needed for privileged writes) is common to both modules.
+    client = window.__uhfSupabase ||
+      (window.__uhfSupabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY));
+  }
 
   function assertAvailable() {
     if (typeof window === 'undefined' || !window.localStorage) {
@@ -36,7 +46,8 @@
     }
   }
 
-  var storage = {
+  // ------------------------------------------------------------ local mode
+  var local = {
     /**
      * @param {string} key
      * @param {string} value  already-serialised JSON string
@@ -88,6 +99,51 @@
       });
     }
   };
+
+  // ---------------------------------------------------------- supabase mode
+  var remote = {
+    set: function (key, value) {
+      return new Promise(function (resolve, reject) {
+        if (typeof key !== 'string' || !key) { reject(new Error('storage.set: key must be a non-empty string')); return; }
+        if (typeof value !== 'string') { reject(new Error('storage.set: value must be a string, got ' + typeof value)); return; }
+        var parsed;
+        try { parsed = JSON.parse(value); }
+        catch (e) { reject(new Error('storage.set: value must be valid JSON for the shared database')); return; }
+        // Mirror locally so the visitor's own device still knows their ID if
+        // the network drops mid-festival. The database stays authoritative.
+        try { window.localStorage.setItem(PREFIX + key, value); } catch (e) { /* cache only */ }
+        client.from(TABLE).upsert({ key: key, value: parsed })
+          .then(function (res) {
+            if (res.error) reject(new Error('storage.set failed for "' + key + '": ' + res.error.message));
+            else resolve(true);
+          }, function (err) {
+            reject(new Error('storage.set failed for "' + key + '": ' + ((err && err.message) || 'network error')));
+          });
+      });
+    },
+
+    get: function (key) {
+      return client.from(TABLE).select('value').eq('key', key).limit(1).maybeSingle()
+        .then(function (res) {
+          if (res.error) throw new Error('storage.get failed for "' + key + '": ' + res.error.message);
+          if (!res.data) throw new Error('storage.get: key not found: ' + key);
+          return { value: JSON.stringify(res.data.value) };
+        });
+    },
+
+    list: function (prefix) {
+      // Prefixes the site uses ('participant:', 'questions:') contain no LIKE
+      // wildcards, so a plain prefix+'%' pattern is exact.
+      return client.from(TABLE).select('key').like('key', (prefix || '') + '%').order('key')
+        .then(function (res) {
+          if (res.error) throw new Error('storage.list failed: ' + res.error.message);
+          return { keys: (res.data || []).map(function (r) { return r.key; }) };
+        });
+    }
+  };
+
+  var storage = client ? remote : local;
+  storage.backend = client ? 'supabase' : 'local';
 
   window.storage = storage;
 })();
