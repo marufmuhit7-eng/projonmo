@@ -116,31 +116,6 @@
             </div>
           </div>
 
-          <!-- ============ Cloud sign-in: Firestore writes need it ============ -->
-          <!-- The Firestore rules allow writes only to a signed-in organiser.
-               This box appears by itself once FIREBASE is configured in
-               src/shared/config.js, and hides again when it is not. -->
-          <div id="cloudAuthBox" class="hidden" style="border:1px dashed var(--gold);border-radius:3px;padding:16px 18px;margin-bottom:26px;background:rgba(255,255,255,0.55);">
-            <div style="font-weight:700;margin-bottom:6px;">
-              <span class="bn">☁️ ক্লাউড সাইন-ইন (Firebase)</span>
-              <span class="en">☁️ Cloud sign-in (Firebase)</span>
-            </div>
-            <div id="cloudAuthSignedOut">
-              <p class="small-note bn" style="margin:0 0 10px;">Firestore-এ পরিবর্তন লিখতে আয়োজক অ্যাকাউন্ট দিয়ে একবার সাইন-ইন করো। এটা উপরের অ্যাডমিন লগইনের থেকে আলাদা — Firebase Console-এ বানানো অ্যাকাউন্ট (firebase/SETUP.md দেখো)।</p>
-              <p class="small-note en" style="margin:0 0 10px;">Sign in once with the organiser account to write to Firestore. This is separate from the admin login above — it is the account created in Firebase Console (see firebase/SETUP.md).</p>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <input type="email" id="cloudAuthEmailInput" placeholder="organiser@example.com" autocomplete="username" style="flex:1;min-width:180px;font-family:var(--f-mono);">
-                <input type="password" id="cloudAuthPassInput" placeholder="••••••••" autocomplete="current-password" style="flex:1;min-width:140px;font-family:var(--f-mono);">
-                <button class="btn btn-primary" onclick="cloudSignIn()" style="white-space:nowrap;"><span class="bn">সাইন-ইন</span><span class="en">Sign in</span></button>
-              </div>
-            </div>
-            <div id="cloudAuthSignedIn" class="hidden" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-              <span class="small-note" style="margin:0;">✅ <span class="bn">সাইন-ইন করা আছে:</span><span class="en">Signed in as</span> <strong id="cloudAuthEmail" style="font-family:var(--f-mono);"></strong></span>
-              <button class="btn btn-ghost" onclick="cloudSignOut()" style="padding:6px 14px;"><span class="bn">সাইন-আউট</span><span class="en">Sign out</span></button>
-            </div>
-            <div id="cloudAuthMsg" style="margin-top:8px;"></div>
-          </div>
-
           <!-- ============ MASTER GATE: isUnlocked ============ -->
           <!-- This is the switch that actually opens the exam for everyone.
                It saves on flip, by itself, so there is no way to think you
@@ -276,20 +251,6 @@
   </div>
 </footer>
 
-<script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-  import {
-    getFirestore, doc, getDoc, setDoc, onSnapshot
-  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-  import {
-    getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
-  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-  window.firebaseSDK = {
-    initializeApp: initializeApp,
-    firestore: { getFirestore, doc, getDoc, setDoc, onSnapshot },
-    auth: { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut }
-  };
-</script>
 <script src="./js/config.js" defer></script>
 <script src="./js/settings.js" defer></script>
 <script src="./js/storage.js" defer></script>

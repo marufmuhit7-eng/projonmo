@@ -159,20 +159,15 @@ function switchAdminSub(sub){
 /** Paint the "which backend is live" banner. Honest about the local case. */
 function renderTimerBackendNote(){
   const note = document.getElementById('timerBackendNote');
-  if(window.examSettings.isRemote && window.examSettings.backend === 'firestore'){
-    note.innerHTML =
-      '<span class="bn">✅ <strong>Firebase Firestore</strong> চালু আছে — এখানে পরিবর্তন করলে <strong>সব ভিজিটরের</strong> ব্রাউজারে সঙ্গে সঙ্গে প্রতিফলিত হবে।</span>' +
-      '<span class="en">✅ <strong>Firebase Firestore</strong> is live — changes here reach <strong>every visitor\'s</strong> browser instantly.</span>';
-    note.style.color = 'var(--sage)';
-  }else if(window.examSettings.isRemote){
+  if(window.examSettings.isRemote){
     note.innerHTML =
       '<span class="bn">✅ শেয়ার্ড ডেটাবেস (Supabase) চালু আছে — এখানে পরিবর্তন করলে <strong>সব ভিজিটরের</strong> পাতায় সঙ্গে সঙ্গে প্রতিফলিত হবে।</span>' +
       '<span class="en">✅ Shared database (Supabase) is active — changes here reach <strong>every visitor</strong> immediately.</span>';
     note.style.color = 'var(--sage)';
   }else{
     note.innerHTML =
-      '<span class="bn">⚠️ এখন <strong>localStorage</strong> ব্যবহার হচ্ছে — পরিবর্তন গ্লোবালি যাবে না। সব ভিজিটরের জন্য কাজ করাতে <code>src/shared/config.js</code>-এর <strong>FIREBASE</strong> অংশে Firebase কনফিগ বসাও (নির্দেশিকা: <code>firebase/SETUP.md</code>)।</span>' +
-      '<span class="en">⚠️ Running on <strong>localStorage</strong> — changes will NOT go global. Fill the <strong>FIREBASE</strong> block in <code>src/shared/config.js</code> to make it work for everyone (guide: <code>firebase/SETUP.md</code>).</span>';
+      '<span class="bn">⚠️ এখন <strong>localStorage</strong> ব্যবহার হচ্ছে — পরিবর্তন গ্লোবালি যাবে না। সব ভিজিটরের জন্য কাজ করাতে <code>src/shared/config.js</code>-এ <strong>Supabase</strong> কনফিগার করো।</span>' +
+      '<span class="en">⚠️ Running on <strong>localStorage</strong> — changes will NOT go global. Configure <strong>Supabase</strong> in <code>src/shared/config.js</code> to make it work for everyone.</span>';
     note.style.color = 'var(--clay-dark)';
   }
 }
@@ -219,7 +214,6 @@ async function loadTimerSettings(){
   const msg = document.getElementById('timerMsg');
   msg.innerHTML = '';
   renderTimerBackendNote();
-  renderCloudAuth();
   try{
     const s = await window.examSettings.load();
     document.getElementById('examUnlockedInput').checked = s.isUnlocked === true;
@@ -276,8 +270,8 @@ async function saveTimerSettings(){
       msg.innerHTML = '<div class="msg ok"><span class="bn">সেটিং <strong>গ্লোবালি</strong> সংরক্ষণ হয়েছে! সব ভিজিটর সঙ্গে সঙ্গে দেখতে পাবে।</span>' +
         '<span class="en">Settings saved <strong>globally</strong>! Every visitor sees it immediately.</span></div>';
     }else{
-      msg.innerHTML = '<div class="msg err"><span class="bn">⚠️ কোনো শেয়ার্ড ডেটাবেস কনফিগার করা নেই — সেভ <strong>গ্লোবালি হয়নি</strong>। <code>src/shared/config.js</code>-এর FIREBASE অংশ পূরণ করো।</span>' +
-        '<span class="en">⚠️ No shared database is configured — nothing was saved <strong>globally</strong>. Fill the FIREBASE block in <code>src/shared/config.js</code>.</span></div>';
+      msg.innerHTML = '<div class="msg err"><span class="bn">⚠️ কোনো শেয়ার্ড ডেটাবেস কনফিগার করা নেই — সেভ <strong>গ্লোবালি হয়নি</strong>। <code>src/shared/config.js</code>-এ Supabase কনফিগার করো।</span>' +
+        '<span class="en">⚠️ No shared database is configured — nothing was saved <strong>globally</strong>. Configure Supabase in <code>src/shared/config.js</code>.</span></div>';
     }
   }catch(err){
     console.error(err);
@@ -290,7 +284,7 @@ async function saveTimerSettings(){
 
 /*
  * MASTER GATE — writes isUnlocked to the shared backend the moment it is
- * flipped. Firestore's onSnapshot then pushes it to every open browser.
+ * flipped. On Supabase, realtime then pushes it to every open browser.
  *
  * On failure the checkbox is put back where it was: the admin must never be
  * left looking at a switch that says "open" when the database says locked.
@@ -305,8 +299,8 @@ async function onExamUnlockedToggled(){
     const s = await window.examSettings.save({ isUnlocked: wanted });
     renderTimerStatus(s);
     if(!window.examSettings.isRemote){
-      msg.innerHTML = '<div class="msg err"><span class="bn">⚠️ কোনো শেয়ার্ড ডেটাবেস কনফিগার করা নেই — পরিবর্তনটি <strong>গ্লোবালি যায়নি</strong>। <code>src/shared/config.js</code>-এর FIREBASE অংশ পূরণ করো (<code>firebase/SETUP.md</code>)।</span>' +
-        '<span class="en">⚠️ No shared database is configured — the change did <strong>not go global</strong>. Fill the FIREBASE block in <code>src/shared/config.js</code> (see <code>firebase/SETUP.md</code>).</span></div>';
+      msg.innerHTML = '<div class="msg err"><span class="bn">⚠️ কোনো শেয়ার্ড ডেটাবেস কনফিগার করা নেই — পরিবর্তনটি <strong>গ্লোবালি যায়নি</strong>। <code>src/shared/config.js</code>-এ Supabase কনফিগার করো।</span>' +
+        '<span class="en">⚠️ No shared database is configured — the change did <strong>not go global</strong>. Configure Supabase in <code>src/shared/config.js</code>.</span></div>';
     }else if(wanted){
       msg.innerHTML = '<div class="msg ok"><span class="bn">✅ পরীক্ষা এখন <strong>সবার জন্য চালু</strong>। সব খোলা ব্রাউজারে সঙ্গে সঙ্গে পৌঁছে গেছে।</span>' +
         '<span class="en">✅ The exam is now <strong>open to everyone</strong>. It reached every open browser instantly.</span></div>';
@@ -317,73 +311,13 @@ async function onExamUnlockedToggled(){
   }catch(err){
     console.error(err);
     box.checked = !wanted;   // never lie about the real state
-    const denied = /permission|insufficient|unauthenticated/i.test(err.message || '');
-    msg.innerHTML = '<div class="msg err"><span class="bn">' + (denied
-      ? '🔒 Firestore-এ লেখার অনুমতি নেই — উপরের <strong>☁️ ক্লাউড সাইন-ইন</strong> বক্সে আয়োজক অ্যাকাউন্ট দিয়ে সাইন-ইন করো, আর <code>firebase/firestore.rules</code> পাবলিশ আছে কি না দেখো।'
-      : 'সংরক্ষণ ব্যর্থ, অবস্থা বদলায়নি: ' + err.message) +
-      '</span><span class="en">' + (denied
-      ? '🔒 Firestore refused the write — sign in with the organiser account in the <strong>☁️ Cloud sign-in</strong> box above, and check that <code>firebase/firestore.rules</code> is published.'
-      : 'Save failed, nothing changed: ' + err.message) + '</span></div>';
+    msg.innerHTML = '<div class="msg err"><span class="bn">সংরক্ষণ ব্যর্থ, অবস্থা বদলায়নি: ' + err.message +
+      '</span><span class="en">Save failed, nothing changed: ' + err.message + '</span></div>';
   }finally{
     box.disabled = false;
   }
 }
 document.getElementById('examUnlockedInput').addEventListener('change', onExamUnlockedToggled);
-
-/* =========================================================================
-   CLOUD SIGN-IN (Firebase) — the organiser's key to WRITE examControl.
-   The Firestore rules accept a write only from a signed-in user, so the
-   admin signs in here once; the session persists on their browser.
-   ========================================================================= */
-function renderCloudAuth(){
-  const box = document.getElementById('cloudAuthBox');
-  if(!box) return;
-  const auth = window.examSettings.auth;
-  if(!auth.available() || auth.provider() !== 'firebase'){
-    box.classList.add('hidden');
-    return;
-  }
-  box.classList.remove('hidden');
-  auth.currentUser().then(function(user){
-    const out = document.getElementById('cloudAuthSignedOut');
-    const inn = document.getElementById('cloudAuthSignedIn');
-    if(user){
-      out.classList.add('hidden');
-      inn.classList.remove('hidden');
-      document.getElementById('cloudAuthEmail').textContent = user.email || user.uid;
-    }else{
-      out.classList.remove('hidden');
-      inn.classList.add('hidden');
-    }
-  }).catch(function(){ /* stay on the signed-out view */ });
-}
-
-async function cloudSignIn(){
-  const msg = document.getElementById('cloudAuthMsg');
-  const email = document.getElementById('cloudAuthEmailInput').value.trim();
-  const pass = document.getElementById('cloudAuthPassInput').value;
-  if(!email || !pass){
-    msg.innerHTML = '<div class="msg err"><span class="bn">ইমেইল ও পাসওয়ার্ড দাও।</span><span class="en">Enter the email and password.</span></div>';
-    return;
-  }
-  msg.innerHTML = '<div class="small-note"><span class="bn">সাইন-ইন হচ্ছে…</span><span class="en">Signing in…</span></div>';
-  try{
-    await window.examSettings.auth.signIn(email, pass);
-    document.getElementById('cloudAuthPassInput').value = '';
-    msg.innerHTML = '<div class="msg ok"><span class="bn">✅ ক্লাউডে সাইন-ইন সম্পন্ন — এখন সেভ সবার জন্য হবে।</span><span class="en">✅ Signed in to the cloud — saves are global now.</span></div>';
-    renderCloudAuth();
-  }catch(err){
-    console.error(err);
-    msg.innerHTML = '<div class="msg err"><span class="bn">সাইন-ইন ব্যর্থ: ' + err.message +
-      '</span><span class="en">Sign-in failed: ' + err.message + '</span></div>';
-  }
-}
-
-async function cloudSignOut(){
-  await window.examSettings.auth.signOut().catch(function(){});
-  document.getElementById('cloudAuthMsg').innerHTML = '';
-  renderCloudAuth();
-}
 
 /* Keep the message fields in step with the two controls that govern them. */
 document.getElementById('timerOffBehaviorInput').addEventListener('change', syncTimerMessageVisibility);

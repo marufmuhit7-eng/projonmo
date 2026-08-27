@@ -69,33 +69,6 @@ def supabase_configured() -> bool:
     return bool(m and m.group(1).strip())
 
 
-def firebase_configured() -> bool:
-    """True when src/shared/config.js has a non-empty FIREBASE.projectId."""
-    cfg = (SRC / "shared" / "config.js").read_text(encoding="utf-8")
-    # Same line-start anchor: the commented example values in the FIREBASE
-    # block must not make the build believe Firebase is configured.
-    m = re.search(r"^\s*projectId:\s*'([^']*)'", cfg, re.MULTILINE)
-    return bool(m and m.group(1).strip())
-
-
-# Firebase ships as ES modules. settings.js is a classic script, so this shim
-# imports the modular SDK and hangs it on window.firebaseSDK before the classic
-# scripts (which are `defer`red, so they run after this module) look for it.
-FIREBASE_SHIM = """<script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-  import {
-    getFirestore, doc, getDoc, setDoc, onSnapshot
-  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-  import {
-    getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
-  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-  window.firebaseSDK = {
-    initializeApp: initializeApp,
-    firestore: { getFirestore, doc, getDoc, setDoc, onSnapshot },
-    auth: { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut }
-  };
-</script>"""
-
 
 PUBLIC_HEAD = f"""<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -278,9 +251,9 @@ README.md
 def page(head: str, body: str, scripts: list[str], vendor: str = "") -> str:
     tags = "\n".join(f'<script src="./js/{s}" defer></script>' for s in scripts)
     if vendor:
-        # Must execute BEFORE settings.js, which looks for window.supabase /
-        # window.firebaseSDK. Classic scripts below are deferred, so a module
-        # shim here is guaranteed to have run first.
+        # Must execute BEFORE settings.js, which looks for window.supabase.
+        # Classic scripts below are deferred, so a CDN script here is
+        # guaranteed to have run first.
         tags = vendor + "\n" + tags
     return f"""<!DOCTYPE html>
 <html lang="bn">
@@ -298,10 +271,7 @@ def page(head: str, body: str, scripts: list[str], vendor: str = "") -> str:
 
 
 def main() -> None:
-    # Firestore takes precedence, matching the backend selection in settings.js.
-    if firebase_configured():
-        vendor = FIREBASE_SHIM
-    elif supabase_configured():
+    if supabase_configured():
         vendor = SUPABASE_CDN
     else:
         vendor = ""

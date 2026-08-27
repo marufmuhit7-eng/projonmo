@@ -466,20 +466,6 @@
   </div>
 </footer>
 
-<script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-  import {
-    getFirestore, doc, getDoc, setDoc, onSnapshot
-  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-  import {
-    getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
-  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-  window.firebaseSDK = {
-    initializeApp: initializeApp,
-    firestore: { getFirestore, doc, getDoc, setDoc, onSnapshot },
-    auth: { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut }
-  };
-</script>
 <script src="./js/config.js" defer></script>
 <script src="./js/settings.js" defer></script>
 <script src="./js/storage.js" defer></script>

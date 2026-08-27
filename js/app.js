@@ -64,7 +64,7 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
  *
  * "Anything else" is doing real work: it covers a fresh browser, a phone that
  * has never seen the admin panel, a failed fetch, an offline visitor, a
- * missing Firestore document and a malformed value. Previously every one of
+ * missing database row and a malformed value. Previously every one of
  * those showed an OPEN exam, because the lock lived only in the admin's own
  * localStorage. That was the bug.
  *

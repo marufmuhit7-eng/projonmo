@@ -16,28 +16,6 @@
  * Never put the service_role / secret key here — that one bypasses RLS.
  */
 window.APP_CONFIG = {
-  /* ── Firebase Firestore ────────────────────────────────────────────────
-   * The exam lock lives at collection `settings`, document `examControl`:
-   *     { isUnlocked: false, targetDate: '2026-09-25T00:00:00' }
-   *
-   * Fill these six values from Firebase Console → Project settings → General
-   * → "Your apps" → SDK setup and configuration → Config. Then: npm run build
-   *
-   * Leave FIREBASE.projectId empty to stay on whatever else is configured.
-   * These values are safe in public JavaScript — they identify the project,
-   * they do not authorise anything. What a browser may DO is decided by the
-   * Firestore security rules (see firestore.rules): the world may read
-   * examControl, only a signed-in organiser may write it.
-   */
-  FIREBASE: {
-    apiKey: 'AIzaSyAHTTwLzPOEEvBw-Nn3rZ5THvkpn1ezwc8',
-    authDomain: 'uttarbanga-heritage-fest.firebaseapp.com',
-    projectId: 'uttarbanga-heritage-fest',
-    storageBucket: 'uttarbanga-heritage-fest.firebasestorage.app',
-    messagingSenderId: '357374069447',
-    appId: '1:357374069447:web:303b707039eee008dacce2'
-  },
-
   // e.g. 'https://abcdefghijklm.supabase.co'  — leave '' to stay on localStorage
   SUPABASE_URL: '',
 

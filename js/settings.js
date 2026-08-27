@@ -34,8 +34,6 @@
   var LOCAL_KEY = 'uhf:settings:exam';
   var TABLE = 'settings';
   var ROW_ID = 1;
-  var FS_COLLECTION = 'settings';
-  var FS_DOC = 'examControl';
 
   /*
    * Shipped defaults = exam LOCKED. This is a security boundary, not a
@@ -200,85 +198,6 @@
     }
   };
 
-  // ---------------------------------------------------- firestore backend
-
-  /*
-   * Firestore backend — collection `settings`, document `examControl`.
-   *
-   *     { isUnlocked: boolean, targetDate: '2026-09-25T00:00:00' }
-   *
-   * targetDate is stored WITHOUT an offset, as specified. Bangladesh has no
-   * DST, so we append the fixed +06:00 on read to get an unambiguous instant;
-   * a bare string would otherwise be parsed in the visitor's own timezone and
-   * the countdown would read differently in Dhaka and London.
-   *
-   * The extra fields (offBehavior, customMessage…) ride along in the same
-   * document so the organiser's existing message feature keeps working.
-   */
-  function makeFirestoreBackend(db, fs) {
-    var ref = fs.doc(db, FS_COLLECTION, FS_DOC);
-
-    function fromDoc(data) {
-      if (!data) return normalise(null);   // no document yet -> LOCKED
-      var iso = DEFAULTS.examStartDate;
-      if (typeof data.targetDate === 'string' && data.targetDate) {
-        // Accept both '…T00:00:00' and a full '…+06:00' form.
-        var raw = /[+-]\d{2}:\d{2}$|Z$/.test(data.targetDate)
-          ? data.targetDate
-          : data.targetDate + TZ;
-        if (!isNaN(Date.parse(raw))) iso = raw;
-      }
-      return normalise({
-        isUnlocked: data.isUnlocked,
-        timerEnabled: typeof data.timerEnabled === 'boolean' ? data.timerEnabled : true,
-        examStartDate: iso,
-        offBehavior: data.offBehavior,
-        customMessage: data.customMessage,
-        customMessageEn: data.customMessageEn
-      });
-    }
-
-    function toDoc(next) {
-      return {
-        isUnlocked: next.isUnlocked === true,
-        // Write back in the documented shape: local wall clock, no offset.
-        targetDate: toDhakaInput(next.examStartDate) + ':00',
-        timerEnabled: next.timerEnabled,
-        offBehavior: next.offBehavior,
-        customMessage: next.customMessage,
-        customMessageEn: next.customMessageEn,
-        updatedAt: new Date().toISOString()
-      };
-    }
-
-    return {
-      name: 'firestore',
-      remote: true,
-
-      load: function () {
-        return fs.getDoc(ref).then(function (snap) {
-          return fromDoc(snap.exists() ? snap.data() : null);
-        });
-      },
-
-      save: function (next) {
-        return fs.setDoc(ref, toDoc(next), { merge: true }).then(function () { return next; });
-      },
-
-      subscribe: function (cb) {
-        // onSnapshot: the admin flips the switch, every open browser follows
-        // within a second. No polling, no refresh.
-        return fs.onSnapshot(ref, function (snap) {
-          cb(fromDoc(snap.exists() ? snap.data() : null));
-        }, function (err) {
-          // Permission denied / offline. Stay with the last known value, which
-          // defaults to LOCKED — never silently open the exam.
-          console.error('[settings] firestore listener error', err);
-        });
-      }
-    };
-  }
-
   // ----------------------------------------------------- supabase backend
 
   function makeSupabaseBackend(client) {
@@ -337,33 +256,8 @@
 
   var backend = localBackend;
   var supabaseClient = null;
-  var firebaseAuth = null;   // Firebase Auth instance, when Firestore won
-  var fsAuthMod = null;      // the firebase-auth module itself
 
-  var fb = cfg.FIREBASE || {};
-  if (fb.projectId && fb.apiKey) {
-    // The modular SDK is exposed as window.firebaseSDK by the loader shim that
-    // build.py injects before this file.
-    if (window.firebaseSDK && window.firebaseSDK.firestore) {
-      try {
-        var sdk = window.firebaseSDK;
-        var app = sdk.initializeApp(fb);
-        backend = makeFirestoreBackend(sdk.firestore.getFirestore(app), sdk.firestore);
-        // Writes to Firestore must satisfy `request.auth != null` in the
-        // published rules, so expose Email/Password auth for the admin panel's
-        // cloud sign-in box. Visitors never sign in; they only read.
-        if (sdk.auth && sdk.auth.getAuth) {
-          fsAuthMod = sdk.auth;
-          firebaseAuth = sdk.auth.getAuth(app);
-        }
-      } catch (e) {
-        console.error('[settings] Firebase init failed; staying LOCKED on the local fallback.', e);
-      }
-    } else {
-      console.warn('[settings] FIREBASE is configured but the Firebase SDK did not load. ' +
-        'Falling back to localStorage — the exam stays LOCKED for safety.');
-    }
-  } else if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
+  if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
     // The SDK is loaded from a CDN by a <script> tag before this file. If that
     // request failed (offline, blocked, sandboxed preview) we degrade instead
     // of throwing, and the admin UI reports which backend actually won.
@@ -407,37 +301,22 @@
     subscribe: function (cb) {
       var stop = backend.subscribe(function (s) { cached = s; cb(s); });
 
-      // Firestore's onSnapshot is authoritative and already reconnects itself.
-      // Polling on top of it would just bill reads for answers we have.
-      if (backend.name !== 'firestore') {
-        var interval = cfg.POLL_INTERVAL_MS || 60000;
-        pollTimer = setInterval(function () {
-          api.load().then(function (s) {
-            if (JSON.stringify(s) !== JSON.stringify(cached)) cb(s);
-          }).catch(function () { /* transient; try again next tick */ });
-        }, interval);
-      }
+      var interval = cfg.POLL_INTERVAL_MS || 60000;
+      pollTimer = setInterval(function () {
+        api.load().then(function (s) {
+          if (JSON.stringify(s) !== JSON.stringify(cached)) cb(s);
+        }).catch(function () { /* transient; try again next tick */ });
+      }, interval);
       return function () {
         stop();
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       };
     },
 
-    // --- organiser auth (Firebase or Supabase — whichever backend won) ----
-    // The Firestore rules demand a signed-in organiser for writes; the admin
-    // panel signs in through these before flipping the master switch.
+    // --- organiser auth (Supabase only) ---------------------------------
     auth: {
-      available: function () { return !!firebaseAuth || !!supabaseClient; },
-      provider: function () {
-        if (firebaseAuth) return 'firebase';
-        if (supabaseClient) return 'supabase';
-        return null;
-      },
+      available: function () { return !!supabaseClient; },
       signIn: function (email, password) {
-        if (firebaseAuth) {
-          return fsAuthMod.signInWithEmailAndPassword(firebaseAuth, email, password)
-            .then(function (cred) { return cred.user; });
-        }
         if (!supabaseClient) return Promise.reject(new Error('no remote backend configured'));
         return supabaseClient.auth.signInWithPassword({ email: email, password: password })
           .then(function (res) {
@@ -446,35 +325,14 @@
           });
       },
       signOut: function () {
-        if (firebaseAuth) return fsAuthMod.signOut(firebaseAuth);
         if (!supabaseClient) return Promise.resolve();
         return supabaseClient.auth.signOut();
       },
       currentUser: function () {
-        if (firebaseAuth) {
-          // onAuthStateChanged fires exactly once with the current user (or
-          // null) — the "get session" primitive the modular SDK lacks.
-          return new Promise(function (resolve) {
-            var stop = fsAuthMod.onAuthStateChanged(firebaseAuth, function (user) {
-              stop();
-              resolve(user);
-            });
-          });
-        }
         if (!supabaseClient) return Promise.resolve(null);
         return supabaseClient.auth.getSession().then(function (res) {
           return res.data && res.data.session ? res.data.session.user : null;
         });
-      },
-      /** Live listener for the admin UI. Returns an unsubscribe function. */
-      onAuthChange: function (cb) {
-        if (firebaseAuth) return fsAuthMod.onAuthStateChanged(firebaseAuth, cb);
-        if (supabaseClient && supabaseClient.auth.onAuthStateChange) {
-          return supabaseClient.auth.onAuthStateChange(function (_ev, session) {
-            cb(session ? session.user : null);
-          });
-        }
-        return function () {};
       }
     },
 
