@@ -10,7 +10,7 @@ afternoon. This server reproduces the rules that matter:
                        /admin.html   -> 308 redirect to /admin
   trailingSlash: false /admin/       -> 308 redirect to /admin
   404.html             anything else -> 404.html with status 404
-  .vercelignore        src/, tools/, supabase/ are not served
+  .vercelignore        src/, tools/, firebase/ are not served
 
 Run:  python3 tools/serve.py [port]     (or: npm run dev)
 """
@@ -27,7 +27,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
 
-BLOCKED = {"src", "tools", "supabase", "node_modules", ".git"}
+BLOCKED = {"src", "tools", "firebase", "node_modules", ".git"}
 
 
 class VercelLikeHandler(http.server.SimpleHTTPRequestHandler):

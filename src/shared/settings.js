@@ -1,83 +1,27 @@
 /*
- * settings.js — shared exam-timer settings, with a swappable backend.
+ * settings.js — exam-control facade over Firestore + Bangladesh date helpers.
  *
- * Exposes window.examSettings. Both the public exam page and the admin panel
- * use it; neither knows or cares which backend is active.
+ * The single source of truth is the Firestore document `settings/examControl`
+ * (read/written through window.db from firebase-db.js). localStorage is never
+ * consulted: a fresh browser, an offline phone and a broken database all get
+ * the same answer — LOCKED.
  *
- *   await examSettings.load()            -> ExamSettings
- *   await examSettings.save(patch)       -> ExamSettings   (admin only)
- *   examSettings.subscribe(cb)           -> unsubscribe fn
- *   examSettings.backend                 -> 'supabase' | 'local'
- *
- * ExamSettings shape:
- *   {
- *     timerEnabled:  boolean,   // show the countdown at all?
- *     examStartDate: string,    // ISO 8601 with offset, e.g. 2026-09-25T00:00:00+06:00
- *     offBehavior:   'live' | 'message',   // what to do when timerEnabled === false
- *     customMessage:   string,  // Bangla,  shown when offBehavior === 'message'
- *     customMessageEn: string   // English, shown when offBehavior === 'message'
- *   }
- *
- * BACKENDS
- *   supabase — one shared row every visitor reads; realtime push on change.
- *              Active when window.APP_CONFIG.SUPABASE_URL is set.
- *   local    — localStorage. Per browser, per origin. A fallback for offline
- *              development, NOT something an event can run on: the admin panel
- *              and the public site are different origins, so a setting saved in
- *              one is invisible to the other. The admin UI says so on screen.
+ *   await examSettings.load()            -> control object (never rejects to OPEN)
+ *   await examSettings.save(patch)       -> merges into settings/examControl
+ *   examSettings.subscribe(cb)           -> realtime onSnapshot; stop-fn returned
+ *   examSettings.current()               -> last loaded value (defaults = LOCKED)
+ *   examSettings.examStatus(s)           -> 'live' | 'countdown'
+ *   toDhakaInput / fromDhakaInput / formatBnDateTime — Dhaka (+06:00) helpers
  */
 (function () {
   'use strict';
 
   var cfg = window.APP_CONFIG || {};
   var TZ = cfg.TZ_OFFSET || '+06:00';
-  var LOCAL_KEY = 'uhf:settings:exam';
-  var TABLE = 'settings';
-  var ROW_ID = 1;
 
-  /*
-   * Shipped defaults = exam LOCKED. This is a security boundary, not a
-   * preference.
-   *
-   * The old defaults were the opposite (timerEnabled:false + offBehavior:'live'
-   * => 'live'), which meant any visitor the settings had never reached — a
-   * fresh browser, a phone, a new device, a backend that was down, a fetch that
-   * failed — was shown an OPEN exam. The lock only ever existed in the one
-   * browser that had written to localStorage.
-   *
-   * isUnlocked is now the single authoritative gate and it FAILS CLOSED:
-   * nothing short of a backend explicitly answering `true` opens the exam.
-   * Loading, offline, no row, parse error, junk value -> locked.
-   */
-  var DEFAULTS = {
-    isUnlocked: false,
-    timerEnabled: true,
-    examStartDate: '2026-09-25T00:00:00' + TZ,
-    offBehavior: 'live',
-    customMessage: '',
-    customMessageEn: ''
-  };
+  var db = window.db;   // firebase-db.js must load before this file
 
-  // ---------------------------------------------------------------- helpers
-
-  /** Coerce anything into a valid ExamSettings, filling gaps from DEFAULTS. */
-  function normalise(raw) {
-    var s = raw && typeof raw === 'object' ? raw : {};
-    var date = typeof s.examStartDate === 'string' && !isNaN(Date.parse(s.examStartDate))
-      ? s.examStartDate
-      : DEFAULTS.examStartDate;
-    return {
-      // Strict identity check, deliberately. 'true', 1, {} and undefined are
-      // all NOT an unlock. Only a real boolean true opens the exam.
-      isUnlocked: s.isUnlocked === true,
-      timerEnabled: typeof s.timerEnabled === 'boolean' ? s.timerEnabled : DEFAULTS.timerEnabled,
-      examStartDate: date,
-      offBehavior: s.offBehavior === 'message' ? 'message' : 'live',
-      customMessage: typeof s.customMessage === 'string' ? s.customMessage : '',
-      customMessageEn: typeof s.customMessageEn === 'string' ? s.customMessageEn : ''
-    };
-  }
-
+  // ------------------------------------------------------------- helpers
   function pad(n) { return String(n).padStart(2, '0'); }
 
   /** Minutes of offset for a '+06:00' / '-05:30' style string. */
@@ -88,10 +32,7 @@
     return m[1] === '-' ? -mins : mins;
   }
 
-  /**
-   * ISO string -> the value a <input type="datetime-local"> expects,
-   * expressed as Bangladesh wall-clock time. Returns '' for unparseable input.
-   */
+  /** ISO string -> <input type="datetime-local"> value in Dhaka wall clock. */
   function toDhakaInput(iso) {
     var ms = Date.parse(iso);
     if (isNaN(ms)) return '';
@@ -100,26 +41,19 @@
       'T' + pad(shifted.getUTCHours()) + ':' + pad(shifted.getUTCMinutes());
   }
 
-  /**
-   * <input type="datetime-local"> value (Bangladesh wall clock) -> ISO string
-   * carrying the +06:00 offset. Returns null when the field is empty/invalid,
-   * so callers can reject the save instead of writing a broken date.
-   */
+  /** datetime-local value (Dhaka wall clock) -> ISO with +06:00. null if invalid. */
   function fromDhakaInput(value) {
     if (typeof value !== 'string') return null;
     var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value.trim());
     if (!m) return null;
     var y = Number(m[1]), mo = Number(m[2]), da = Number(m[3]);
     var h = Number(m[4]), mi = Number(m[5]), se = Number(m[6] || 0);
-
-    // Date.parse happily rolls 2026-02-30 over into March, so check the
-    // calendar explicitly instead of trusting it.
+    // Date.parse happily rolls 2026-02-30 into March — check the calendar.
     var probe = new Date(Date.UTC(y, mo - 1, da, h, mi, se));
     if (probe.getUTCFullYear() !== y || probe.getUTCMonth() !== mo - 1 || probe.getUTCDate() !== da ||
         probe.getUTCHours() !== h || probe.getUTCMinutes() !== mi || probe.getUTCSeconds() !== se) {
       return null;
     }
-
     var iso = m[1] + '-' + m[2] + '-' + m[3] + 'T' + m[4] + ':' + m[5] + ':' + pad(se) + TZ;
     return isNaN(Date.parse(iso)) ? null : iso;
   }
@@ -145,208 +79,59 @@
       toBnDigits(d[0]) + ', ' + toBnDigits(pad(h12)) + ':' + toBnDigits(t[1]) + ' ' + ampm;
   }
 
+  /** Today in Dhaka as 'YYYY-MM-DD' — used for the registration window. */
+  function dhakaToday() {
+    return toDhakaInput(new Date().toISOString()).slice(0, 10);
+  }
+
+  /** Is the registration window open right now? Fail-open question, fail-closed exam. */
+  function registrationOpen(s) {
+    var n = normalise(s);
+    var today = dhakaToday();
+    return today >= n.registrationStart && today <= n.registrationEnd;
+  }
+
   /**
-   * Reduce the raw settings to the one thing everybody actually asks:
-   * can a candidate sit the exam right now?
-   *
-   * 'live'      -> exam is open, the countdown box is hidden
-   * 'countdown' -> locked, counting down to examStartDate
-   * 'closed'    -> locked, showing the organiser's message
+   * 'live'      -> the organiser explicitly unlocked the exam
+   * 'countdown' -> everything else: locked, countdown to examDate
    */
   function examStatus(s) {
-    var n = normalise(s);
-
-    // The gate. Locked unless the backend said true, full stop. Note what is
-    // NOT here any more: the exam no longer opens itself just because
-    // examStartDate slipped past. A date passing is not consent — the
-    // organiser flips the switch.
-    if (n.isUnlocked !== true) {
-      return (!n.timerEnabled && n.offBehavior === 'message') ? 'closed' : 'countdown';
-    }
-    return 'live';
+    return normalise(s).isUnlocked === true ? 'live' : 'countdown';
   }
 
-  // -------------------------------------------------------- local backend
+  function normalise(raw) { return db._internal.normControl(raw); }
 
-  var localBackend = {
-    name: 'local',
-    remote: false,
-    load: function () {
-      return new Promise(function (resolve) {
-        var raw = null;
-        try { raw = window.localStorage.getItem(LOCAL_KEY); } catch (e) { /* private mode */ }
-        if (!raw) return resolve(normalise(null));
-        try { resolve(normalise(JSON.parse(raw))); }
-        catch (e) { resolve(normalise(null)); }
-      });
-    },
-    save: function (next) {
-      return new Promise(function (resolve) {
-        window.localStorage.setItem(LOCAL_KEY, JSON.stringify(next));
-        resolve(next);
-      });
-    },
-    subscribe: function (cb) {
-      // Fires only for OTHER tabs on the SAME origin. Cross-origin is impossible.
-      function onStorage(e) {
-        if (e.key === LOCAL_KEY) {
-          try { cb(normalise(JSON.parse(e.newValue))); } catch (err) { /* ignore */ }
-        }
-      }
-      window.addEventListener('storage', onStorage);
-      return function () { window.removeEventListener('storage', onStorage); };
-    }
-  };
-
-  // ----------------------------------------------------- supabase backend
-
-  function makeSupabaseBackend(client) {
-    return {
-      name: 'supabase',
-      remote: true,
-      client: client,
-
-      load: function () {
-        return client.from(TABLE).select('*').eq('id', ROW_ID).maybeSingle()
-          .then(function (res) {
-            if (res.error) throw new Error('settings load failed: ' + res.error.message);
-            // Row absent on a fresh project -> defaults, not a crash.
-            if (!res.data) return normalise(null);
-            return normalise({
-              timerEnabled: res.data.timer_enabled,
-              examStartDate: res.data.exam_start_date,
-              offBehavior: res.data.off_behavior,
-              customMessage: res.data.custom_message,
-              customMessageEn: res.data.custom_message_en
-            });
-          });
-      },
-
-      save: function (next) {
-        return client.from(TABLE).upsert({
-          id: ROW_ID,
-          timer_enabled: next.timerEnabled,
-          exam_start_date: next.examStartDate,
-          off_behavior: next.offBehavior,
-          custom_message: next.customMessage,
-          custom_message_en: next.customMessageEn,
-          updated_at: new Date().toISOString()
-        }).select().single().then(function (res) {
-          if (res.error) {
-            // RLS rejects an unauthenticated write — surface it plainly.
-            throw new Error('settings save rejected: ' + res.error.message);
-          }
-          return next;
-        });
-      },
-
-      subscribe: function (cb) {
-        var channel = client
-          .channel('exam-settings')
-          .on('postgres_changes',
-            { event: '*', schema: 'public', table: TABLE },
-            function () { api.load().then(cb).catch(function () { /* keep last known */ }); })
-          .subscribe();
-        return function () { client.removeChannel(channel); };
-      }
-    };
-  }
-
-  // ------------------------------------------------------------ selection
-
-  var backend = localBackend;
-  var supabaseClient = null;
-
-  if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
-    // The SDK is loaded from a CDN by a <script> tag before this file. If that
-    // request failed (offline, blocked, sandboxed preview) we degrade instead
-    // of throwing, and the admin UI reports which backend actually won.
-    if (window.supabase && typeof window.supabase.createClient === 'function') {
-      // Shared with storage.js (window.__uhfSupabase) so there is exactly one
-      // client, one auth session and one realtime socket per browser.
-      supabaseClient = window.__uhfSupabase ||
-        (window.__uhfSupabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY));
-      backend = makeSupabaseBackend(supabaseClient);
-    } else {
-      console.warn('[settings] SUPABASE_URL is configured but the supabase-js SDK did not load. ' +
-        'Falling back to localStorage — settings will NOT be shared between visitors.');
-    }
-  }
-
-  // ------------------------------------------------------------ public API
-
+  // ---------------------------------------------------------- the facade
   var cached = null;
-  var pollTimer = null;
 
-  var api = {
-    DEFAULTS: DEFAULTS,
-    backend: backend.name,
-    isRemote: backend.remote,
+  window.examSettings = {
+    DEFAULTS: db.DEFAULT_CONTROL,
+    backend: db.active ? 'firestore' : 'unconfigured',
+    isRemote: db.active,
 
-    /** Last value returned by load(), or DEFAULTS if load() has not run yet. */
     current: function () { return cached ? cached : normalise(null); },
 
     load: function () {
-      return backend.load().then(function (s) { cached = s; return s; });
+      return db.getControl().then(function (s) { cached = s; return s; });
     },
 
-    /** Merge a partial update into the current settings and persist. */
+    /** Merge a partial update into settings/examControl. Admin only. */
     save: function (patch) {
-      var next = normalise(Object.assign({}, cached || normalise(null), patch || {}));
-      return backend.save(next).then(function () { cached = next; return next; });
+      return db.saveControl(patch).then(function (s) { cached = s; return s; });
     },
 
-    /**
-     * Call cb(settings) whenever they change elsewhere. Realtime on Supabase;
-     * a storage event plus slow polling otherwise. Returns an unsubscribe fn,
-     * which callers MUST invoke on teardown or the poll timer leaks.
-     */
+    /** Realtime: the organiser flips the switch, every open browser follows. */
     subscribe: function (cb) {
-      var stop = backend.subscribe(function (s) { cached = s; cb(s); });
-
-      var interval = cfg.POLL_INTERVAL_MS || 60000;
-      pollTimer = setInterval(function () {
-        api.load().then(function (s) {
-          if (JSON.stringify(s) !== JSON.stringify(cached)) cb(s);
-        }).catch(function () { /* transient; try again next tick */ });
-      }, interval);
-      return function () {
-        stop();
-        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-      };
+      return db.onControl(function (s) { cached = s; cb(s); });
     },
 
-    // --- organiser auth (Supabase only) ---------------------------------
-    auth: {
-      available: function () { return !!supabaseClient; },
-      signIn: function (email, password) {
-        if (!supabaseClient) return Promise.reject(new Error('no remote backend configured'));
-        return supabaseClient.auth.signInWithPassword({ email: email, password: password })
-          .then(function (res) {
-            if (res.error) throw new Error(res.error.message);
-            return res.data.user;
-          });
-      },
-      signOut: function () {
-        if (!supabaseClient) return Promise.resolve();
-        return supabaseClient.auth.signOut();
-      },
-      currentUser: function () {
-        if (!supabaseClient) return Promise.resolve(null);
-        return supabaseClient.auth.getSession().then(function (res) {
-          return res.data && res.data.session ? res.data.session.user : null;
-        });
-      }
-    },
-
-    // --- exposed for the admin form and for tests ------------------------
+    // exposed for the admin form and for tests
     normalise: normalise,
     examStatus: examStatus,
+    registrationOpen: registrationOpen,
+    dhakaToday: dhakaToday,
     toDhakaInput: toDhakaInput,
     fromDhakaInput: fromDhakaInput,
-    formatBnDateTime: formatBnDateTime,
-    toBnDigits: toBnDigits
+    formatBnDateTime: formatBnDateTime
   };
-
-  window.examSettings = api;
 })();

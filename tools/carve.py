@@ -5,7 +5,7 @@ carve.py — ONE-TIME migration: split the single-app tree into src/.
 Reads the current index.html + js/app.js and produces:
 
   src/shared/styles.css      unchanged
-  src/shared/storage.js      unchanged
+  src/shared/config.js       unchanged
   src/shared/common.js       QUESTIONS, CATEGORY_LABELS, getCategoryKey, lang toggle
   src/shared/images/         unchanged
   src/shared/head.html       <head> contents shared by both apps
@@ -66,7 +66,8 @@ def main() -> None:
 
     # --- shared, copied verbatim ------------------------------------------
     shutil.copy2(ROOT / "css" / "styles.css", SRC / "shared" / "styles.css")
-    shutil.copy2(ROOT / "js" / "storage.js", SRC / "shared" / "storage.js")
+    for name in ("config.js", "firebase-config.js", "firebase-db.js", "settings.js"):
+        shutil.copy2(ROOT / "js" / name, SRC / "shared" / name)
     for img in (ROOT / "images").iterdir():
         shutil.copy2(img, SRC / "shared" / "images" / img.name)
 

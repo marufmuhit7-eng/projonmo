@@ -30,14 +30,14 @@
     </div>
 
     <div id="adminPanel" class="hidden">
-      <!-- ☁️ Organiser sign-in: appears only when Supabase is configured.
-           Privileged writes (questions, timer, master switch) are allowed by
-           the database only for a signed-in organiser. -->
+      <!-- ☁️ Organiser sign-in: appears only when Firebase is configured.
+           Privileged writes (questions, exam control, registrations list)
+           are allowed by the Firestore rules only for a signed-in organiser. -->
       <div id="cloudAuthBox" class="hidden" style="border:1px dashed var(--gold);border-radius:3px;padding:14px 18px;margin-bottom:22px;background:rgba(255,255,255,0.55);">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
           <div style="font-weight:700;">
-            <span class="bn">☁️ আয়োজক সাইন-ইন (Supabase)</span>
-            <span class="en">☁️ Organiser sign-in (Supabase)</span>
+            <span class="bn">☁️ আয়োজক সাইন-ইন (Firebase)</span>
+            <span class="en">☁️ Organiser sign-in (Firebase)</span>
           </div>
           <span id="cloudAuthEmail" class="small-note" style="margin:0;font-family:var(--f-mono);"></span>
           <button class="btn btn-ghost" id="cloudAuthSignOutBtn" onclick="cloudSignOut()" style="padding:6px 14px;" hidden><span class="bn">সাইন-আউট</span><span class="en">Sign out</span></button>
@@ -52,10 +52,10 @@
 
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
         <div class="tabs">
-          <button class="tab-btn admin-sub-btn active" data-sub="questions" onclick="switchAdminSub('questions')"><span class="bn">প্রশ্ন ম্যানেজমেন্ট</span><span class="en">Questions</span></button>
-          <button class="tab-btn admin-sub-btn" data-sub="timer" onclick="switchAdminSub('timer')"><span class="bn">টাইমার নিয়ন্ত্রণ</span><span class="en">Timer</span></button>
+          <button class="tab-btn admin-sub-btn active" data-sub="timer" onclick="switchAdminSub('timer')"><span class="bn">পরীক্ষা নিয়ন্ত্রণ</span><span class="en">Exam Control</span></button>
+          <button class="tab-btn admin-sub-btn" data-sub="questions" onclick="switchAdminSub('questions')"><span class="bn">প্রশ্ন ম্যানেজমেন্ট</span><span class="en">Questions</span></button>
           <button class="tab-btn admin-sub-btn" data-sub="regs" onclick="switchAdminSub('regs')"><span class="bn">রেজিস্ট্রেশন তালিকা</span><span class="en">Registrations</span></button>
-          <button class="tab-btn admin-sub-btn" data-sub="password" onclick="switchAdminSub('password')"><span class="bn">পাসওয়ার্ড</span><span class="en">Password</span></button>
+          <button class="tab-btn admin-sub-btn" data-sub="password" onclick="switchAdminSub('password')"><span class="bn">পাসওয়ার্ড সেটিংস</span><span class="en">Password Settings</span></button>
         </div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
           <span id="adminWhoami" class="small-note" style="margin:0;"></span>
@@ -78,14 +78,66 @@
             <option value="junior">জুনিয়র (৬ষ্ঠ-৮ম)</option>
             <option value="senior">সিনিয়র (৯ম-১০ম)</option>
           </select>
-          <p class="small-note bn" style="margin-top:14px;">নিচের বক্সে JSON ফরম্যাটে প্রশ্ন লেখো/পেস্ট করো, তারপর "সংরক্ষণ করো" চাপো। প্রতিটা প্রশ্নে ৪টা অপশন ও correct (সঠিক উত্তরের index, ০ থেকে শুরু) থাকতে হবে।</p>
-          <p class="small-note en" style="margin-top:2px;">Paste questions in JSON format below, then click Save. Each question needs 4 options and a "correct" index (0-based).</p>
-          <textarea id="adminQJson" style="width:100%;min-height:320px;font-family:var(--f-mono);font-size:0.82rem;padding:12px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);margin-top:10px;"></textarea>
-          <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
-            <button class="btn btn-primary" onclick="saveAdminQuestions()"><span class="bn">সংরক্ষণ করো</span><span class="en">Save Questions</span></button>
-            <button class="btn btn-ghost" onclick="loadAdminQuestions()"><span class="bn">রিলোড করো</span><span class="en">Reload</span></button>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
+            <button class="btn btn-ghost" onclick="loadAdminQuestions()"><span class="bn">তালিকা রিফ্রেশ করো</span><span class="en">Refresh list</span></button>
+            <button class="btn btn-ghost" onclick="resetQuestionForm()"><span class="bn">➕ নতুন প্রশ্ন লিখো</span><span class="en">➕ New question</span></button>
           </div>
-          <div id="adminQMsg"></div>
+
+          <!-- ============ add / edit one question ============ -->
+          <div style="border:1px solid var(--panel-border);border-radius:3px;padding:16px 18px;margin-top:16px;background:rgba(255,255,255,0.55);">
+            <h4 style="margin:0;"><span class="bn">প্রশ্ন যোগ / সম্পাদনা</span><span class="en">Add / edit question</span></h4>
+            <input type="hidden" id="qEditId">
+
+            <label style="margin-top:12px;"><span class="bn">প্রশ্ন (বাংলা) *</span><span class="en">Question (Bangla) *</span></label>
+            <textarea id="qBnInput" rows="2" placeholder="যেমন: রংপুর বিভাগ কয়টি জেলা নিয়ে গঠিত?" style="width:100%;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);font-family:inherit;font-size:0.95rem;"></textarea>
+
+            <label style="margin-top:10px;"><span class="bn">প্রশ্ন (ইংরেজি — ঐচ্ছিক)</span><span class="en">Question (English — optional)</span></label>
+            <textarea id="qEnInput" rows="2" placeholder="e.g. How many districts make up Rangpur Division?" style="width:100%;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);font-family:inherit;font-size:0.95rem;"></textarea>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;" id="qOptionsGrid">
+              <div><label><span class="bn">ক — অপশন A *</span><span class="en">Option A *</span></label><input id="qOptBn0" style="width:100%;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);"></div>
+              <div><label><span class="bn">A (ইংরেজি — ঐচ্ছিক)</span><span class="en">A English (optional)</span></label><input id="qOptEn0" style="width:100%;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);"></div>
+              <div><label><span class="bn">খ — অপশন B *</span><span class="en">Option B *</span></label><input id="qOptBn1" style="width:100%;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);"></div>
+              <div><label><span class="bn">B (ইংরেজি — ঐচ্ছিক)</span><span class="en">B English (optional)</span></label><input id="qOptEn1" style="width:100%;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);"></div>
+              <div><label><span class="bn">গ — অপশন C *</span><span class="en">Option C *</span></label><input id="qOptBn2" style="width:100%;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);"></div>
+              <div><label><span class="bn">C (ইংরেজি — ঐচ্ছিক)</span><span class="en">C English (optional)</span></label><input id="qOptEn2" style="width:100%;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);"></div>
+              <div><label><span class="bn">ঘ — অপশন D *</span><span class="en">Option D *</span></label><input id="qOptBn3" style="width:100%;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);"></div>
+              <div><label><span class="bn">D (ইংরেজি — ঐচ্ছিক)</span><span class="en">D English (optional)</span></label><input id="qOptEn3" style="width:100%;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);"></div>
+            </div>
+
+            <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;">
+              <div style="flex:0 0 160px;">
+                <label><span class="bn">সঠিক উত্তর *</span><span class="en">Correct *</span></label>
+                <select id="qCorrectInput" style="width:100%;padding:10px;">
+                  <option value="A">ক (A)</option><option value="B">খ (B)</option>
+                  <option value="C">গ (C)</option><option value="D">ঘ (D)</option>
+                </select>
+              </div>
+              <div style="flex:0 0 120px;">
+                <label><span class="bn">ক্রম</span><span class="en">Order</span></label>
+                <input type="number" id="qOrderInput" min="1" style="width:100%;padding:10px;font-family:var(--f-mono);">
+              </div>
+            </div>
+
+            <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="saveQuestionForm()"><span class="bn">সংরক্ষণ করো</span><span class="en">Save</span></button>
+              <button class="btn btn-ghost" onclick="resetQuestionForm()"><span class="bn">মুছে ফেলো</span><span class="en">Clear</span></button>
+            </div>
+            <div id="adminQMsg" style="margin-top:10px;"></div>
+          </div>
+
+          <!-- ============ question list ============ -->
+          <div style="overflow-x:auto;margin-top:18px;">
+            <table class="lb">
+              <thead><tr>
+                <th>#</th><th><span class="bn">প্রশ্ন</span><span class="en">Question</span></th>
+                <th><span class="bn">সঠিক</span><span class="en">Correct</span></th>
+                <th></th>
+              </tr></thead>
+              <tbody id="adminQListBody"><tr><td colspan="4" style="text-align:center;padding:24px;">…</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -93,7 +145,7 @@
       <div id="adminTimer" class="hidden">
         <div class="form-box" style="max-width:100%;">
 
-          <h3 style="margin-top:0;"><span class="bn">পরীক্ষার টাইমার নিয়ন্ত্রণ</span><span class="en">Exam Timer Control</span></h3>
+          <h3 style="margin-top:0;"><span class="bn">পরীক্ষা নিয়ন্ত্রণ</span><span class="en">Exam Control</span></h3>
 
           <!-- Which backend is actually live right now -->
           <div id="timerBackendNote" class="small-note" style="margin-top:0;"></div>
@@ -130,43 +182,21 @@
             </div>
           </div>
 
-          <!-- ON / OFF -->
-          <div style="display:flex;align-items:center;gap:14px;">
-            <label class="switch" for="timerEnabledInput" aria-label="Show the countdown timer">
-              <input type="checkbox" id="timerEnabledInput">
-              <span class="switch-track"><span class="switch-thumb"></span></span>
-            </label>
-            <label for="timerEnabledInput" style="cursor:pointer;margin:0;font-weight:400;">
-              <span class="bn"><strong>কাউন্টডাউন টাইমার দেখাও (পরীক্ষা লক করো)</strong> — চালু করলে নির্ধারিত তারিখ পর্যন্ত পরীক্ষা বন্ধ থাকবে ও কাউন্টডাউন দেখাবে। বন্ধ রাখলে পরীক্ষা এখনই চালু (LIVE)।</span>
-              <span class="en"><strong>Show the countdown (lock the exam)</strong> — on: the exam stays closed until the date below and a countdown is shown. Off: the exam is LIVE right now.</span>
-            </label>
-          </div>
+          <!-- Exam date + registration window -->
+          <label style="margin-top:22px;"><span class="bn">পরীক্ষার তারিখ ও সময় (বাংলাদেশ সময়)</span><span class="en">Exam date &amp; time (Bangladesh time)</span></label>
+          <input type="datetime-local" id="examDateInput" style="font-family:var(--f-mono);">
+          <p class="small-note bn" style="margin-top:6px;">লক থাকলে এই সময় পর্যন্ত কাউন্টডাউন চলবে। তারিখ পেরোলেও পরীক্ষা নিজে থেকে খুলবে না — উপরের মাস্টার সুইচ দিয়ে খুলতে হবে।</p>
+          <p class="small-note en" style="margin-top:6px;">While locked, the countdown runs to this moment. A passing date never opens the exam by itself — the master switch does.</p>
 
-          <!-- Exam start date -->
-          <label style="margin-top:22px;"><span class="bn">পরীক্ষা শুরুর তারিখ ও সময় (বাংলাদেশ সময়)</span><span class="en">Exam start date &amp; time (Bangladesh time)</span></label>
-          <input type="datetime-local" id="timerDateInput" style="font-family:var(--f-mono);">
-          <p class="small-note bn" style="margin-top:6px;">টাইমার চালু থাকলে এই সময় পর্যন্ত কাউন্টডাউন চলবে, তারপর পরীক্ষা নিজে থেকেই খুলে যাবে।</p>
-          <p class="small-note en" style="margin-top:6px;">While the timer is on, the countdown runs to this moment and the exam then opens by itself.</p>
+          <label style="margin-top:18px;"><span class="bn">রেজিস্ট্রেশন শুরুর তারিখ</span><span class="en">Registration start date</span></label>
+          <input type="date" id="regStartInput" style="font-family:var(--f-mono);">
 
-          <!-- What happens when the timer is OFF -->
-          <label style="margin-top:22px;"><span class="bn">টাইমার বন্ধ থাকলে কী হবে?</span><span class="en">When the timer is off, what should happen?</span></label>
-          <select id="timerOffBehaviorInput">
-            <option value="live">পরীক্ষা সরাসরি চালু থাকবে (Exam is live)</option>
-            <option value="message">নিজের লেখা একটি বার্তা দেখাবে (Show a custom message)</option>
-          </select>
-
-          <!-- Custom message, only relevant for offBehavior = message -->
-          <div id="timerMessageWrap" class="hidden">
-            <label style="margin-top:18px;"><span class="bn">বার্তা (বাংলা)</span><span class="en">Message (Bangla)</span></label>
-            <textarea id="timerMessageBnInput" rows="3" placeholder="যেমন: পরীক্ষা সাময়িকভাবে বন্ধ আছে। শীঘ্রই জানানো হবে।" style="width:100%;padding:12px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);font-family:inherit;font-size:0.95rem;"></textarea>
-
-            <label style="margin-top:14px;"><span class="bn">বার্তা (ইংরেজি)</span><span class="en">Message (English)</span></label>
-            <textarea id="timerMessageEnInput" rows="3" placeholder="e.g. The exam is paused for now. We will announce the new time soon." style="width:100%;padding:12px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);font-family:inherit;font-size:0.95rem;"></textarea>
-          </div>
+          <label style="margin-top:14px;"><span class="bn">রেজিস্ট্রেশন শেষের তারিখ</span><span class="en">Registration end date</span></label>
+          <input type="date" id="regEndInput" style="font-family:var(--f-mono);">
 
           <div style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap;">
-            <button class="btn btn-primary" id="timerSaveBtn" onclick="saveTimerSettings()"><span class="bn">সংরক্ষণ করো</span><span class="en">Save</span></button>
-            <button class="btn btn-ghost" onclick="loadTimerSettings()"><span class="bn">রিলোড করো</span><span class="en">Reload</span></button>
+            <button class="btn btn-primary" id="timerSaveBtn" onclick="saveExamControl()"><span class="bn">সংরক্ষণ করো</span><span class="en">Save</span></button>
+            <button class="btn btn-ghost" onclick="loadExamControl()"><span class="bn">রিলোড করো</span><span class="en">Reload</span></button>
           </div>
           <div id="timerMsg"></div>
         </div>
@@ -203,8 +233,10 @@
       <!-- Registrations viewer -->
       <div id="adminRegs" class="hidden">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
-          <p class="bn" style="margin:0;color:rgba(36,28,21,0.7);">সব রেজিস্ট্রেশনের তালিকা — এই তথ্য শুধু তুমিই দেখতে পাচ্ছ।</p>
-          <button class="btn btn-ghost" onclick="loadAdminRegistrations()"><span class="bn">রিফ্রেশ করো</span><span class="en">Refresh</span></button>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <input type="text" id="regsSearchInput" oninput="renderAdminRegsTable()" placeholder="🔍 নাম / মোবাইল / ইমেইল খোঁজো" style="padding:10px 14px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);min-width:220px;">
+            <button class="btn btn-ghost" onclick="loadAdminRegistrations()"><span class="bn">রিফ্রেশ করো</span><span class="en">Refresh</span></button>
+          </div>
         </div>
         <div id="regsSourceNote" class="small-note" style="margin:-6px 0 14px;"></div>
         <div style="overflow-x:auto;">

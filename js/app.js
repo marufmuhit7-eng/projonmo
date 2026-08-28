@@ -19,6 +19,26 @@ function bnDigits(n){
 }
 
 /* ---------- Registration ---------- */
+let latestControl = null;   // last settings/examControl we heard about
+
+/** Badge above the form: is the registration window open right now? */
+function renderRegWindowNote(){
+  const note = document.getElementById('regWindowNote');
+  if(!note) return;
+  const s = latestControl || window.examSettings.current();
+  if(window.examSettings.registrationOpen(s)){
+    note.innerHTML = '<div class="msg ok"><span class="bn">✅ রেজিস্ট্রেশন চলছে — ' +
+      window.examSettings.formatBnDateTime(s.registrationStart + 'T00:00:00+06:00').split(',')[0] +
+      ' থেকে ' + window.examSettings.formatBnDateTime(s.registrationEnd + 'T00:00:00+06:00').split(',')[0] +
+      ' পর্যন্ত।</span><span class="en">✅ Registration is open.</span></div>';
+  }else{
+    note.innerHTML = '<div class="msg err"><span class="bn">⛔ রেজিস্ট্রেশন এখন বন্ধ। নির্ধারিত সময়: ' +
+      window.examSettings.formatBnDateTime(s.registrationStart + 'T00:00:00+06:00').split(',')[0] +
+      ' – ' + window.examSettings.formatBnDateTime(s.registrationEnd + 'T00:00:00+06:00').split(',')[0] +
+      '。</span><span class="en">⛔ Registration is closed right now.</span></div>';
+  }
+}
+
 document.getElementById('regForm').addEventListener('submit', async function(e){
   e.preventDefault();
   const msgBox = document.getElementById('regMsg');
@@ -33,11 +53,19 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
     msgBox.innerHTML = '<div class="msg err"><span class="bn">সব বাধ্যতামূলক ঘর পূরণ করো।</span><span class="en">Please fill all required fields.</span></div>';
     return;
   }
+  // The registration window is controlled globally from Firestore too.
+  if(!window.examSettings.registrationOpen(latestControl)){
+    msgBox.innerHTML = '<div class="msg err"><span class="bn">রেজিস্ট্রেশনের নির্ধারিত সময় শেষ হয়ে গেছে।</span><span class="en">The registration window has closed.</span></div>';
+    return;
+  }
   const id = genId();
-  const data = {id,name,school,cls,area,phone,email,examTaken:false,score:0,timeTakenSec:0,submittedAt:null,registeredAt:new Date().toISOString()};
   try{
-    const res = await window.storage.set('participant:'+id, JSON.stringify(data), true);
-    if(!res){ throw new Error('save failed'); }
+    await window.db.addRegistration({
+      pid:id, name, school, cls, area, phone, email,
+      category: getCategoryKey(cls)
+    });
+    // Cache our own ID locally (a convenience copy, never the source of truth).
+    try{ window.localStorage.setItem('uhf:myreg:'+id, JSON.stringify({pid:id,name})); }catch(e){ /* ignore */ }
     msgBox.innerHTML = `
       <div class="msg ok">
         <span class="bn">রেজিস্ট্রেশন সফল হয়েছে! তোমার আইডি সংরক্ষণ করে রাখো।</span>
@@ -48,7 +76,7 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
     document.getElementById('examIdInput').value = id;
   }catch(err){
     console.error(err);
-    msgBox.innerHTML = '<div class="msg err"><span class="bn">সংরক্ষণ ব্যর্থ হয়েছে, আবার চেষ্টা করো।</span><span class="en">Save failed, please try again.</span></div>';
+    msgBox.innerHTML = '<div class="msg err"><span class="bn">' + (err.message || 'সংরক্ষণ ব্যর্থ হয়েছে, আবার চেষ্টা করো।') + '</span><span class="en">' + (err.message || 'Save failed, please try again.') + '</span></div>';
   }
 });
 
@@ -79,7 +107,7 @@ let unsubscribeExamSettings = null;
 
 /** The moment the exam opens, as a Date. Falls back to the built-in default. */
 function examStartAt(){
-  return new Date((examSettings || window.examSettings.current()).examStartDate);
+  return new Date((examSettings || window.examSettings.current()).examDate);
 }
 
 function stopCountdown(){
@@ -125,25 +153,15 @@ function renderExamGate(s){
   examBody.classList.add('hidden');
   lockedBox.classList.remove('hidden');
 
-  // Organiser chose a message instead of a countdown.
-  if(!s.timerEnabled && s.offBehavior === 'message'){
-    countdownEl.classList.add('hidden');
-    if(heading[0]) heading[0].textContent = '📢 ঘোষণা';
-    if(heading[1]) heading[1].textContent = '📢 Notice';
-    lockedBn.textContent = s.customMessage || 'পরীক্ষা আপাতত বন্ধ আছে।';
-    lockedEn.textContent = s.customMessageEn || s.customMessage || 'The exam is closed for now.';
-    return;
-  }
-
-  // Default locked view: the Bengali countdown.
+  // Locked view: the Bengali countdown to examDate.
   countdownEl.classList.remove('hidden');
   if(heading[0]) heading[0].textContent = '⏳ পরীক্ষা এখনো শুরু হয়নি';
   if(heading[1]) heading[1].textContent = "⏳ The exam hasn't started yet";
 
-  const startAt = new Date(s.examStartDate);
+  const startAt = new Date(s.examDate);
   if(new Date() < startAt){
     lockedBn.textContent =
-      window.examSettings.formatBnDateTime(s.examStartDate) +
+      window.examSettings.formatBnDateTime(s.examDate) +
       ' তারিখ থেকে পরীক্ষা শুরু হবে। এই সময়ের আগে পরীক্ষায় অংশ নেওয়া যাবে না। নিচে কতক্ষণ বাকি তা দেখা যাচ্ছে:';
     lockedEn.textContent =
       'The exam opens on ' + startAt.toLocaleString('en-GB', { dateStyle: 'long', timeStyle: 'short' }) +
@@ -179,12 +197,13 @@ function tickCountdown(){
 }
 
 /*
- * Push updates: on Supabase this is a realtime subscription, so an organiser
- * flipping the switch reaches everyone already sitting on the page. On the
- * localStorage fallback it is a same-origin storage event plus slow polling.
+ * Push updates: Firestore onSnapshot, so an organiser flipping the switch
+ * reaches everyone already sitting on the page — no refresh, no polling.
  */
 unsubscribeExamSettings = window.examSettings.subscribe(function(s){
   examSettings = s;
+  latestControl = s;
+  renderRegWindowNote();
   renderExamGate(s);
 });
 window.addEventListener('pagehide', function(){
@@ -193,10 +212,11 @@ window.addEventListener('pagehide', function(){
 });
 
 async function loadQuestionsForCategory(catKey){
+  // Firestore first; the bundled set is only a fallback for the categories
+  // the organiser has not filled in yet (or while Firebase is unconfigured).
   try{
-    const res = await window.storage.get('questions:'+catKey, true);
-    const parsed = JSON.parse(res.value);
-    if(Array.isArray(parsed) && parsed.length>0) return parsed;
+    const remote = await window.db.listQuestions(catKey);
+    if(Array.isArray(remote) && remote.length>0) return remote;
   }catch(err){ /* fall back below */ }
   return QUESTIONS[catKey];
 }
@@ -228,9 +248,11 @@ async function startExam(){
   }
   let record;
   try{
-    const res = await window.storage.get('participant:'+id, true);
-    record = JSON.parse(res.value);
+    record = await window.db.findRegistration(id);
   }catch(err){
+    record = null;
+  }
+  if(!record){
     msgBox.innerHTML = '<div class="msg err"><span class="bn">এই আইডি খুঁজে পাওয়া যায়নি।</span><span class="en">This ID was not found.</span></div>';
     return;
   }
@@ -249,7 +271,7 @@ async function startExam(){
   userAnswers = new Array(currentQuestions.length).fill(null);
   document.getElementById('examLogin').classList.add('hidden');
   document.getElementById('examBody').classList.remove('hidden');
-  document.getElementById('examParticipantName').textContent = record.name + ' (' + record.id + ') — ' + CATEGORY_LABELS[catKey].bn;
+  document.getElementById('examParticipantName').textContent = record.name + ' (' + (record.pid || record.id) + ') — ' + CATEGORY_LABELS[catKey].bn;
   renderQuestions();
   timeLeft = 600;
   examStartTime = Date.now();
@@ -322,7 +344,14 @@ async function submitExam(){
   currentParticipant.timeTakenSec = timeTakenSec;
   currentParticipant.submittedAt = new Date().toISOString();
   try{
-    await window.storage.set('participant:'+currentParticipant.id, JSON.stringify(currentParticipant), true);
+    await window.db.saveExamResult(currentParticipant.pid || currentParticipant.id, {
+      name: currentParticipant.name,
+      school: currentParticipant.school || '',
+      area: currentParticipant.area || '',
+      examTaken: true, score, maxScore, timeTakenSec,
+      category: currentCategory,
+      submittedAt: currentParticipant.submittedAt
+    });
   }catch(err){ console.error('Failed to save exam result', err); }
 
   document.getElementById('examBody').classList.add('hidden');
@@ -338,17 +367,8 @@ async function loadLeaderboard(){
   const body = document.getElementById('lbBody');
   body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;">…</td></tr>';
   try{
-    const listRes = await window.storage.list('participant:', true);
-    const keys = (listRes && listRes.keys) ? listRes.keys : [];
-    const records = [];
-    for(const k of keys){
-      try{
-        const r = await window.storage.get(k, true);
-        const rec = JSON.parse(r.value);
-        if(rec.examTaken) records.push(rec);
-      }catch(e){ /* skip broken entries */ }
-    }
-    allLeaderboardRecords = records;
+    const records = await window.db.listLeaderboard();
+    allLeaderboardRecords = records.filter(r => r && r.examTaken);
     renderLeaderboardTable(currentLbCategory);
   }catch(err){
     console.error(err);

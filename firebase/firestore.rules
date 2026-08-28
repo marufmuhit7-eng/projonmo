@@ -1,0 +1,75 @@
+rules_version = '2';
+
+// =====================================================================
+//  Uttarbanga Heritage Fest — Firestore security rules
+//
+//  Firebase Console → Firestore Database → Rules → এই পুরোটা পেস্ট → Publish
+//
+//  সরল ইংরেজিতে মডেলটা:
+//    · সবাই পড়তে পারে  -> settings/examControl, questions, leaderboard
+//    · সবাই লিখতে পারে -> নতুন registration (create), নিজের স্কোর সেভ,
+//                        leaderboard রো (পরীক্ষা জমা দেওয়ার সময়)
+//    · শুধু সাইন-ইন করা আয়োজক লিখতে পারে -> examControl, questions
+//    · সবাই মুছতে পারে না
+//
+//  ⚠️ সততার সাথে (honest limitations):
+//    1. অ্যাডমিন আলাদা করা হয়েছে শুধু "সাইন-ইন করেছে কি না" দিয়ে
+//       (request.auth != null)। তাই Authentication-এ শুধু একটাই অ্যাকাউন্ট
+//       রাখো — পাবলিক সাইন-আপ চালু করলে যে কেউ অ্যাকাউন্ট বানিয়ে
+//       প্রশ্ন বদলাতে পারবে। (Email/Password মেথডে সাইন-আপ পেজ নেই;
+//       অ্যাকাউন্ট তৈরি হয় শুধু Console থেকে — এটাই রক্ষা করছে।)
+//    2. স্কোর ও leaderboard রো পাবলিকভাবে লেখা হয় (পরীক্ষা যিনি দেয়, তার
+//       ব্রাউজার থেকে)। রুলস সীমিত করেছে কোন কোন ফিল্ড বদলানো যায় তা,
+//       কিন্তু আসল প্রতিযোগিতার মতো করে স্কোর পাহারা দিতে হলে ভবিষ্যতে
+//       অংশগ্রহণকারীদের জন্যও Firebase Auth চালু করতে হবে।
+// =====================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- পরীক্ষার লক + তারিখ: সবাই পড়ে, শুধু আয়োজক লেখে -------------
+    match /settings/examControl {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // ---- প্রশ্ন: সবাই পড়ে, শুধু আয়োজক লেখে ---------------------------
+    match /questions/{qid} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // ---- রেজিস্ট্রেশন -----------------------------------------------
+    match /registrations/{pid} {
+      // যে কেউ নতুন রেজিস্ট্রেশন করতে পারে — ন্যূনতম ভ্যালিডেশন সহ।
+      allow create: if request.resource.data.keys().hasAll(['pid', 'name', 'phone'])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.phone is string
+                    && request.resource.data.pid == pid;
+      // পরীক্ষায় ঢোকার সময় একটি রেকর্ড আইডি দিয়ে আনা হয় — আইডি ছাড়া
+      // পুরো তালিকা (ফোন নম্বরসহ) ডেমে নেওয়া যায় না।
+      allow get: if true;
+      allow list: if request.auth != null;   // অ্যাডমিন টেবিল
+      // পরীক্ষা জমা দিলে স্কোর-সংক্রান্ত ফিল্ডগুলোই শুধু বদলানো যায়।
+      allow update: if request.resource.data.diff(resource.data).affectedKeys()
+                      .hasOnly(['examTaken', 'score', 'maxScore', 'timeTakenSec',
+                                'category', 'submittedAt']);
+      allow delete: if false;
+    }
+
+    // ---- লিডারবোর্ড (পাবলিক স্কোর — ফোন/ইমেইল নেই) --------------------
+    match /leaderboard/{pid} {
+      allow read: if true;
+      // পরীক্ষা জমার সময় প্রার্থীর ব্রাউজার থেকেই লেখা হয় — উপরের নোট ২ দেখো।
+      allow create, update: if request.resource.data.name is string
+                            && request.resource.data.score is number;
+      allow delete: if false;
+    }
+
+    // ---- বাকি সব বন্ধ --------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

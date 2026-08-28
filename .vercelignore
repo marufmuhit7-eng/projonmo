@@ -1,6 +1,6 @@
 src
 tools
-supabase
+firebase
 node_modules
 README.md
 .gitignore
