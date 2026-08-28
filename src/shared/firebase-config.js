@@ -18,10 +18,10 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 window.FIREBASE_CONFIG = {
-  apiKey: '',            // ← যেমন: 'AIzaSy…'
-  authDomain: '',        // ← যেমন: 'your-project.firebaseapp.com'
-  projectId: '',         // ← যেমন: 'your-project'
-  storageBucket: '',     // ← যেমন: 'your-project.appspot.com'
-  messagingSenderId: '', // ← যেমন: '123456789012'
-  appId: ''              // ← যেমন: '1:123456789012:web:abcdef123456'
+  apiKey: 'AIzaSyAHTTwLzPOEEvBw-Nn3rZ5THvkpn1ezwc8',
+  authDomain: 'uttarbanga-heritage-fest.firebaseapp.com',
+  projectId: 'uttarbanga-heritage-fest',
+  storageBucket: 'uttarbanga-heritage-fest.firebasestorage.app',
+  messagingSenderId: '357374069447',
+  appId: '1:357374069447:web:303b707039eee008dacce2'
 };
