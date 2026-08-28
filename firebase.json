@@ -6,6 +6,12 @@
       "**/.*",
       "**/node_modules/**",
       ".github/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
     ]
   }
 }
