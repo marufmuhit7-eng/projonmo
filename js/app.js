@@ -39,9 +39,36 @@ function renderRegWindowNote(){
   }
 }
 
+/**
+ * Map a failed registration write to a plain Bangla sentence plus the likely
+ * fix. err.code comes from the Firebase SDK ('permission-denied',
+ * 'unavailable', …) — it is always logged to the console too.
+ */
+function registrationErrorTexts(err){
+  const code = String((err && err.code) || '').toLowerCase();
+  const msg  = String((err && err.message) || '').toLowerCase();
+  if(!window.db || !window.db.active){
+    return { bn: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন। (Firebase কনফিগার করা নেই)',
+             en: 'Registration failed. Please try again. (Firebase is not configured)' };
+  }
+  if(code.indexOf('permission') !== -1 || msg.indexOf('permission_denied') !== -1){
+    return { bn: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন। (কারণ: Firestore রুলস পাবলিশ করা হয়নি — firebase/SETUP.md ধাপ ৪)',
+             en: 'Registration failed. Please try again. (Cause: Firestore rules not published — see firebase/SETUP.md step 4)' };
+  }
+  if(code.indexOf('unavailable') !== -1 || code.indexOf('failed-precondition') !== -1 ||
+     code.indexOf('not-found') !== -1 || msg.indexOf('service_disabled') !== -1 || msg.indexOf('cloud firestore api has not been used') !== -1){
+    return { bn: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন। (কারণ: Firestore ডাটাবেস এখনো তৈরি হয়নি — firebase/SETUP.md ধাপ ৩)',
+             en: 'Registration failed. Please try again. (Cause: the Firestore database has not been created — see firebase/SETUP.md step 3)' };
+  }
+  return { bn: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।',
+           en: 'Registration failed. Please try again.' };
+}
+
 document.getElementById('regForm').addEventListener('submit', async function(e){
-  e.preventDefault();
+  e.preventDefault();   // never reload the page mid-submit
   const msgBox = document.getElementById('regMsg');
+  const btn = document.getElementById('regSubmitBtn');
+  const btnOriginal = btn.innerHTML;
   msgBox.innerHTML = '';
   const name=document.getElementById('r_name').value.trim();
   const school=document.getElementById('r_school').value.trim();
@@ -59,6 +86,8 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
     return;
   }
   const id = genId();
+  btn.disabled = true;
+  btn.innerHTML = '<span class="bn">জমা হচ্ছে…</span><span class="en">Submitting…</span>';
   try{
     await window.db.addRegistration({
       pid:id, name, school, cls, area, phone, email,
@@ -75,8 +104,12 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
     document.getElementById('regForm').reset();
     document.getElementById('examIdInput').value = id;
   }catch(err){
-    console.error(err);
-    msgBox.innerHTML = '<div class="msg err"><span class="bn">' + (err.message || 'সংরক্ষণ ব্যর্থ হয়েছে, আবার চেষ্টা করো।') + '</span><span class="en">' + (err.message || 'Save failed, please try again.') + '</span></div>';
+    console.error('[registration] failed:', (err && err.code) || '', err);
+    const t = registrationErrorTexts(err);
+    msgBox.innerHTML = '<div class="msg err"><span class="bn">' + t.bn + '</span><span class="en">' + t.en + '</span></div>';
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = btnOriginal;
   }
 });
 

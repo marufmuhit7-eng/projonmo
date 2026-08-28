@@ -1,11 +1,16 @@
 {
   "hosting": {
     "public": ".",
+    "cleanUrls": true,
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**",
-      ".github/**"
+      ".github/**",
+      "src/**",
+      "tools/**",
+      "firebase/**",
+      "README.md"
     ],
     "rewrites": [
       {

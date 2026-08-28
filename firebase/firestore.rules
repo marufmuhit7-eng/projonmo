@@ -73,3 +73,23 @@ service cloud.firestore {
     }
   }
 }
+
+// =====================================================================
+//  ⚠️ শুধু ১০ মিনিটের টেস্টের জন্য (ইভেন্টের সময় কখনোই নয়!)
+//  নিচের ব্লকটা কপি করে উপরের পুরো rules_version...{...} অংশটা বদলে
+//  দিলে রেজিস্ট্রেশন রাইট নিশ্চিতভাবে চলবে — কিন্তু তখন যে কেউ
+//  প্রশ্ন বদলে / পরীক্ষা আনলক করে দিতে পারবে। টেস্ট শেষে উপরের
+//  নিরাপদ সংস্করণেই ফিরে এসো।
+//
+//  service cloud.firestore {
+//    match /databases/{database}/documents {
+//      match /registrations/{id} {
+//        allow read: if true;
+//        allow create: if true;
+//        allow update, delete: if false;
+//      }
+//      match /settings/{id}   { allow read, write: if true; }
+//      match /questions/{id}  { allow read, write: if true; }
+//    }
+//  }
+// =====================================================================
