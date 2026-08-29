@@ -66,7 +66,7 @@ def main() -> None:
 
     # --- shared, copied verbatim ------------------------------------------
     shutil.copy2(ROOT / "css" / "styles.css", SRC / "shared" / "styles.css")
-    for name in ("config.js", "firebase-config.js", "firebase-db.js", "settings.js"):
+    for name in ("config.js", "supabase-config.js", "supabase-db.js", "settings.js"):
         shutil.copy2(ROOT / "js" / name, SRC / "shared" / name)
     for img in (ROOT / "images").iterdir():
         shutil.copy2(img, SRC / "shared" / "images" / img.name)

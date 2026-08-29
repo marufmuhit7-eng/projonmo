@@ -1,8 +1,8 @@
 /*
  * settings.test.js — exam-control facade + Dhaka date helpers.
- * Firebase is NOT mocked here: this file proves the fail-closed behaviour of
+ * Supabase is NOT mocked here: this file proves the fail-closed behaviour of
  * an UNCONFIGURED site (no SDK, no config) — the state every fresh visitor's
- * browser would be in if Firebase were missing, blocked or offline.
+ * browser would be in if Supabase were missing, blocked or offline.
  *
  * Run:  node tools/settings.test.js
  */
@@ -10,8 +10,8 @@
 
 global.window = { APP_CONFIG: { TZ_OFFSET: '+06:00' } };
 
-require('../src/shared/firebase-config.js');
-require('../src/shared/firebase-db.js');
+require('../src/shared/supabase-config.js');
+require('../src/shared/supabase-db.js');
 require('../src/shared/settings.js');
 const S = global.window.examSettings;
 
@@ -25,8 +25,8 @@ function check(label, cond, detail) {
 (async function run() {
   console.log('exam settings — unconfigured / fail-closed\n');
 
-  check("backend is 'unconfigured' when FIREBASE_CONFIG is empty", S.backend === 'unconfigured', S.backend);
-  check('isRemote is false without Firebase', S.isRemote === false);
+  check("backend is 'unconfigured' when SUPABASE_URL is empty", S.backend === 'unconfigured', S.backend);
+  check('isRemote is false without Supabase', S.isRemote === false);
 
   // ---- defaults: THE SECURITY BOUNDARY ---------------------------------
   const d = await S.load();
@@ -53,7 +53,7 @@ function check(label, cond, detail) {
   // ---- unconfigured writes must reject (never pretend to be global) ------
   let rejected = false;
   try { await S.save({ isUnlocked: true }); } catch (e) { rejected = true; }
-  check('save() rejects while Firebase is unconfigured', rejected);
+  check('save() rejects while Supabase is unconfigured', rejected);
 
   // ---- subscribe with no backend: fires once with LOCKED defaults --------
   let seen = null;

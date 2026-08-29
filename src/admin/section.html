@@ -30,14 +30,14 @@
     </div>
 
     <div id="adminPanel" class="hidden">
-      <!-- ☁️ Organiser sign-in: appears only when Firebase is configured.
+      <!-- ☁️ Organiser sign-in: appears only when Supabase is configured.
            Privileged writes (questions, exam control, registrations list)
-           are allowed by the Firestore rules only for a signed-in organiser. -->
+           are allowed by the RLS policies only for a signed-in organiser. -->
       <div id="cloudAuthBox" class="hidden" style="border:1px dashed var(--gold);border-radius:3px;padding:14px 18px;margin-bottom:22px;background:rgba(255,255,255,0.55);">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
           <div style="font-weight:700;">
-            <span class="bn">☁️ আয়োজক সাইন-ইন (Firebase)</span>
-            <span class="en">☁️ Organiser sign-in (Firebase)</span>
+            <span class="bn">☁️ আয়োজক সাইন-ইন (Supabase)</span>
+            <span class="en">☁️ Organiser sign-in (Supabase)</span>
           </div>
           <span id="cloudAuthEmail" class="small-note" style="margin:0;font-family:var(--f-mono);"></span>
           <button class="btn btn-ghost" id="cloudAuthSignOutBtn" onclick="cloudSignOut()" style="padding:6px 14px;" hidden><span class="bn">সাইন-আউট</span><span class="en">Sign out</span></button>
@@ -82,7 +82,10 @@
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
             <button class="btn btn-ghost" onclick="loadAdminQuestions()"><span class="bn">তালিকা রিফ্রেশ করো</span><span class="en">Refresh list</span></button>
             <button class="btn btn-ghost" onclick="resetQuestionForm()"><span class="bn">➕ নতুন প্রশ্ন লিখো</span><span class="en">➕ New question</span></button>
+            <button class="btn btn-ghost" onclick="importOldQuestions()"><span class="bn">📦 পুরনো প্রশ্ন লোড করো</span><span class="en">📦 Load old questions</span></button>
           </div>
+          <p class="small-note bn" style="margin-top:8px;">📦 "পুরনো প্রশ্ন লোড করো" — কোডে বানানো নমুনা প্রশ্নগুলো একবারে ডেটাবেসে তোলে; ক্যাটাগরিতে আগেই প্রশ্ন থাকলে কিছু করে না (ডুপ্লিকেট হয় না)।</p>
+          <p class="small-note en" style="margin-top:4px;">📦 "Load old questions" uploads the bundled sample set once; if the category already has questions it does nothing (no duplicates).</p>
 
           <!-- ============ add / edit one question ============ -->
           <div style="border:1px solid var(--panel-border);border-radius:3px;padding:16px 18px;margin-top:16px;background:rgba(255,255,255,0.55);">

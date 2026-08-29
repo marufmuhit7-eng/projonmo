@@ -1,8 +1,8 @@
 /*
- * settings.js — exam-control facade over Firestore + Bangladesh date helpers.
+ * settings.js — exam-control facade over Supabase + Bangladesh date helpers.
  *
- * The single source of truth is the Firestore document `settings/examControl`
- * (read/written through window.db from firebase-db.js). localStorage is never
+ * The single source of truth is the Supabase `settings` row (id = 'exam')
+ * (read/written through window.db from supabase-db.js). localStorage is never
  * consulted: a fresh browser, an offline phone and a broken database all get
  * the same answer — LOCKED.
  *
@@ -19,7 +19,7 @@
   var cfg = window.APP_CONFIG || {};
   var TZ = cfg.TZ_OFFSET || '+06:00';
 
-  var db = window.db;   // firebase-db.js must load before this file
+  var db = window.db;   // supabase-db.js must load before this file
 
   // ------------------------------------------------------------- helpers
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -106,7 +106,7 @@
 
   window.examSettings = {
     DEFAULTS: db.DEFAULT_CONTROL,
-    backend: db.active ? 'firestore' : 'unconfigured',
+    backend: db.active ? 'supabase' : 'unconfigured',
     isRemote: db.active,
 
     current: function () { return cached ? cached : normalise(null); },

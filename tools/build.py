@@ -8,7 +8,7 @@ build.py — generate the single deployable site from src/, into the repo root.
             css/ js/ images/ robots.txt
 
 Everything is emitted at the repo root so Vercel needs NO Root Directory
-setting: import the repo, click Deploy, done. tools/, src/ and firebase/ are
+setting: import the repo, click Deploy, done. tools/, src/ and supabase/ are
 kept out of the deployment by .vercelignore.
 
 index.html and admin.html sit at the same depth, so both use the identical
@@ -55,22 +55,18 @@ FONTS = (
     '&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">'
 )
 
-# Firebase compat SDK — pulled in only when firebase-config.js is filled in,
-# so an unconfigured build makes zero third-party requests and stays on the
+# supabase-js is pulled in only when supabase-config.js is filled in, so an
+# unconfigured build makes zero third-party requests and stays on the
 # fail-closed defaults (exam LOCKED).
-FIREBASE_SDK = (
-    '<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>\n'
-    '<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>\n'
-    '<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>'
-)
+SUPABASE_CDN = '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>'
 
 
-def firebase_configured() -> bool:
-    """True when src/shared/firebase-config.js has a non-empty apiKey."""
-    cfg = (SRC / "shared" / "firebase-config.js").read_text(encoding="utf-8")
-    # ^\s* anchors to the start of a line so the commented example values
-    # ("// ← যেমন: 'AIzaSy…'") never count as configuration.
-    m = re.search(r"^\s*apiKey:\s*'([^']*)'", cfg, re.MULTILINE)
+def supabase_configured() -> bool:
+    """True when src/shared/supabase-config.js has a non-empty SUPABASE_URL."""
+    cfg = (SRC / "shared" / "supabase-config.js").read_text(encoding="utf-8")
+    # ^\s* anchors to the start of a line so commented-out example values
+    # never count as configuration.
+    m = re.search(r"^\s*SUPABASE_URL:\s*'([^']*)'", cfg, re.MULTILINE)
     return bool(m and m.group(1).strip())
 
 
@@ -246,7 +242,7 @@ VERCEL_JSON = {
 
 VERCEL_IGNORE = """src
 tools
-firebase
+supabase
 node_modules
 README.md
 .gitignore
@@ -256,9 +252,9 @@ README.md
 def page(head: str, body: str, scripts: list[str], vendor: str = "") -> str:
     tags = "\n".join(f'<script src="./js/{s}" defer></script>' for s in scripts)
     if vendor:
-        # Must execute BEFORE firebase-db.js, which looks for window.firebase.
-        # The CDN scripts are synchronous, the site scripts deferred, so the
-        # SDK is guaranteed to be present when firebase-db.js runs.
+        # Must execute BEFORE supabase-db.js, which looks for window.supabase.
+        # The CDN script is synchronous while the site scripts are deferred,
+        # so the SDK is guaranteed to be present when supabase-db.js runs.
         tags = vendor + "\n" + tags
     return f"""<!DOCTYPE html>
 <html lang="bn">
@@ -276,8 +272,8 @@ def page(head: str, body: str, scripts: list[str], vendor: str = "") -> str:
 
 
 def main() -> None:
-    if firebase_configured():
-        vendor = FIREBASE_SDK
+    if supabase_configured():
+        vendor = SUPABASE_CDN
     else:
         vendor = ""
 
@@ -287,7 +283,7 @@ def main() -> None:
         (ROOT / sub).mkdir(parents=True, exist_ok=True)
 
     shutil.copy2(SRC / "shared" / "styles.css", ROOT / "css" / "styles.css")
-    for name in ("firebase-config.js", "firebase-db.js", "config.js", "settings.js", "common.js", "auth.js"):
+    for name in ("supabase-config.js", "supabase-db.js", "config.js", "settings.js", "common.js", "auth.js"):
         shutil.copy2(SRC / "shared" / name, ROOT / "js" / name)
     shutil.copy2(SRC / "public" / "app.js", ROOT / "js" / "app.js")
     shutil.copy2(SRC / "admin" / "admin.js", ROOT / "js" / "admin.js")
@@ -297,7 +293,7 @@ def main() -> None:
     # ---------------- index.html (public) ----------------
     body = (SRC / "public" / "body.html").read_text(encoding="utf-8").strip()
     (ROOT / "index.html").write_text(
-        page(PUBLIC_HEAD, body, ["firebase-config.js", "firebase-db.js", "config.js", "settings.js", "common.js", "app.js"], vendor),
+        page(PUBLIC_HEAD, body, ["supabase-config.js", "supabase-db.js", "config.js", "settings.js", "common.js", "app.js"], vendor),
         encoding="utf-8",
     )
 
@@ -308,7 +304,7 @@ def main() -> None:
     footer = (SRC / "shared" / "footer.html").read_text(encoding="utf-8").strip()
     (ROOT / "admin.html").write_text(
         page(ADMIN_HEAD, f"{ADMIN_NAV}\n\n{section}\n\n{footer}",
-             ["firebase-config.js", "firebase-db.js", "config.js", "settings.js", "common.js", "auth.js", "admin.js"], vendor),
+             ["supabase-config.js", "supabase-db.js", "config.js", "settings.js", "common.js", "auth.js", "admin.js"], vendor),
         encoding="utf-8",
     )
 

@@ -41,24 +41,25 @@ function renderRegWindowNote(){
 
 /**
  * Map a failed registration write to a plain Bangla sentence plus the likely
- * fix. err.code comes from the Firebase SDK ('permission-denied',
- * 'unavailable', …) — it is always logged to the console too.
+ * fix. Supabase errors arrive as { message, code, hint } and are always
+ * logged to the console too.
  */
 function registrationErrorTexts(err){
-  const code = String((err && err.code) || '').toLowerCase();
-  const msg  = String((err && err.message) || '').toLowerCase();
+  const msg = String((err && err.message) || '').toLowerCase();
+  const hint = String((err && err.hint) || '').toLowerCase();
+  const all = msg + ' ' + hint;
   if(!window.db || !window.db.active){
-    return { bn: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন। (Firebase কনফিগার করা নেই)',
-             en: 'Registration failed. Please try again. (Firebase is not configured)' };
+    return { bn: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন। (Supabase কনফিগার করা নেই)',
+             en: 'Registration failed. Please try again. (Supabase is not configured)' };
   }
-  if(code.indexOf('permission') !== -1 || msg.indexOf('permission_denied') !== -1){
-    return { bn: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন। (কারণ: Firestore রুলস পাবলিশ করা হয়নি — firebase/SETUP.md ধাপ ৪)',
-             en: 'Registration failed. Please try again. (Cause: Firestore rules not published — see firebase/SETUP.md step 4)' };
+  if(all.indexOf('could not find the table') !== -1 || all.indexOf('does not exist') !== -1 ||
+     all.indexOf('pgrst205') !== -1){
+    return { bn: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন। (কারণ: ডেটাবেস টেবিল তৈরি হয়নি — Supabase SQL Editor-এ supabase/schema.sql চালাও)',
+             en: 'Registration failed. Please try again. (Cause: tables missing — run supabase/schema.sql in the Supabase SQL Editor)' };
   }
-  if(code.indexOf('unavailable') !== -1 || code.indexOf('failed-precondition') !== -1 ||
-     code.indexOf('not-found') !== -1 || msg.indexOf('service_disabled') !== -1 || msg.indexOf('cloud firestore api has not been used') !== -1){
-    return { bn: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন। (কারণ: Firestore ডাটাবেস এখনো তৈরি হয়নি — firebase/SETUP.md ধাপ ৩)',
-             en: 'Registration failed. Please try again. (Cause: the Firestore database has not been created — see firebase/SETUP.md step 3)' };
+  if(all.indexOf('row-level security') !== -1 || all.indexOf('permission') !== -1){
+    return { bn: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন। (কারণ: RLS পলিসি ঠিক নেই — supabase/schema.sql আবার চালাও)',
+             en: 'Registration failed. Please try again. (Cause: RLS policies missing — re-run supabase/schema.sql)' };
   }
   return { bn: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।',
            en: 'Registration failed. Please try again.' };
@@ -80,7 +81,7 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
     msgBox.innerHTML = '<div class="msg err"><span class="bn">সব বাধ্যতামূলক ঘর পূরণ করো।</span><span class="en">Please fill all required fields.</span></div>';
     return;
   }
-  // The registration window is controlled globally from Firestore too.
+  // The registration window is controlled globally from Supabase too.
   if(!window.examSettings.registrationOpen(latestControl)){
     msgBox.innerHTML = '<div class="msg err"><span class="bn">রেজিস্ট্রেশনের নির্ধারিত সময় শেষ হয়ে গেছে।</span><span class="en">The registration window has closed.</span></div>';
     return;
@@ -230,7 +231,7 @@ function tickCountdown(){
 }
 
 /*
- * Push updates: Firestore onSnapshot, so an organiser flipping the switch
+ * Push updates: Supabase Realtime, so an organiser flipping the switch
  * reaches everyone already sitting on the page — no refresh, no polling.
  */
 unsubscribeExamSettings = window.examSettings.subscribe(function(s){
@@ -245,8 +246,8 @@ window.addEventListener('pagehide', function(){
 });
 
 async function loadQuestionsForCategory(catKey){
-  // Firestore first; the bundled set is only a fallback for the categories
-  // the organiser has not filled in yet (or while Firebase is unconfigured).
+  // Supabase first; the bundled set is only a fallback for the categories
+  // the organiser has not filled in yet (or while Supabase is unconfigured).
   try{
     const remote = await window.db.listQuestions(catKey);
     if(Array.isArray(remote) && remote.length>0) return remote;

@@ -2,9 +2,9 @@
    Admin panel  ·  অ্যাডমিন প্যানেল
    ---------------------------------------------------------------------------
    Login gate:      window.adminAuth (local, hashed — keeps casual visitors out)
-   Cloud data:      window.db (Firestore — questions, exam control, regs)
+   Cloud data:      window.db (Supabase — questions, exam control, regs)
                     Privileged writes need the ☁️ organiser sign-in, because
-                    the published Firestore rules demand request.auth != null.
+   the RLS policies allow writes only to a signed-in organiser.
    ========================================================================= */
 
 let adminLoggedIn = false;
@@ -156,7 +156,7 @@ function switchAdminSub(sub){
 }
 
 /* =========================================================================
-   Exam control  ·  পরীক্ষা নিয়ন্ত্রণ  (Firestore: settings/examControl)
+   Exam control  ·  পরীক্ষা নিয়ন্ত্রণ  (Supabase table: settings, row id='exam')
    ========================================================================= */
 
 /** Which backend is live — honest banner, no "this browser only" surprises. */
@@ -164,13 +164,13 @@ function renderBackendNote(){
   const note = document.getElementById('timerBackendNote');
   if(window.db.active){
     note.innerHTML =
-      '<span class="bn">✅ <strong>Firebase Firestore</strong> চালু — এখানে পরিবর্তন করলে <strong>সব ভিজিটরের</strong> ব্রাউজারে সঙ্গে সঙ্গে প্রতিফলিত হবে।</span>' +
-      '<span class="en">✅ <strong>Firebase Firestore</strong> is live — changes here reach <strong>every visitor\'s</strong> browser instantly.</span>';
+      '<span class="bn">✅ <strong>Supabase</strong> চালু — এখানে পরিবর্তন করলে <strong>সব ভিজিটরের</strong> ব্রাউজারে সঙ্গে সঙ্গে প্রতিফলিত হবে।</span>' +
+      '<span class="en">✅ <strong>Supabase</strong> is live — changes here reach <strong>every visitor\'s</strong> browser instantly.</span>';
     note.style.color = 'var(--sage)';
   }else{
     note.innerHTML =
-      '<span class="bn">⚠️ Firebase কনফিগার করা নেই — পরিবর্তন গ্লোবালি যাবে না। <code>src/shared/firebase-config.js</code>-এ ৬টা মান বসিয়ে <code>npm run build</code> চালাও (নির্দেশিকা: <code>firebase/SETUP.md</code>)।</span>' +
-      '<span class="en">⚠️ Firebase is not configured — nothing will go global. Paste your config into <code>src/shared/firebase-config.js</code> and run <code>npm run build</code> (guide: <code>firebase/SETUP.md</code>).</span>';
+      '<span class="bn">⚠️ Supabase কনফিগার করা নেই — পরিবর্তন গ্লোবালি যাবে না। <code>src/shared/supabase-config.js</code> পূরণ করো (নির্দেশিকা: <code>supabase/SETUP.md</code>)।</span>' +
+      '<span class="en">⚠️ Supabase is not configured — nothing will go global. Fill in <code>src/shared/supabase-config.js</code> (guide: <code>supabase/SETUP.md</code>).</span>';
     note.style.color = 'var(--clay-dark)';
   }
 }
@@ -258,13 +258,13 @@ async function saveExamControl(){
 
 /* Shared, honest write-failure messages. */
 function writeErrorBn(err){
-  if(!window.db.active) return '⚠️ Firebase কনফিগার করা নেই — <code>src/shared/firebase-config.js</code> পূরণ করো।';
-  if(/permission|unauthenticated|insufficient/i.test(err.message||'')) return '🔒 Firestore লেখার অনুমতি নেই — উপরের <strong>☁️ আয়োজক সাইন-ইন</strong> বক্সে সাইন-ইন করো ও <code>firebase/firestore.rules</code> পাবলিশ আছে কি না দেখো।';
+  if(!window.db.active) return '⚠️ Supabase কনফিগার করা নেই — <code>src/shared/supabase-config.js</code> পূরণ করো।';
+  if(/row-level security|permission|jwt|unauthenticated/i.test(err.message||'')) return '🔒 ডেটাবেস লেখার অনুমতি নেই — উপরের <strong>☁️ আয়োজক সাইন-ইন</strong> বক্সে সাইন-ইন করো আর <code>supabase/schema.sql</code> চালানো আছে কি না দেখো।';
   return 'সংরক্ষণ ব্যর্থ: ' + err.message;
 }
 function writeErrorEn(err){
-  if(!window.db.active) return '⚠️ Firebase is not configured — fill in <code>src/shared/firebase-config.js</code>.';
-  if(/permission|unauthenticated|insufficient/i.test(err.message||'')) return '🔒 Firestore refused the write — sign in via the <strong>☁️ Organiser sign-in</strong> box above and check that <code>firebase/firestore.rules</code> is published.';
+  if(!window.db.active) return '⚠️ Supabase is not configured — fill in <code>src/shared/supabase-config.js</code>.';
+  if(/row-level security|permission|jwt|unauthenticated/i.test(err.message||'')) return '🔒 The database refused the write — sign in via the <strong>☁️ Organiser sign-in</strong> box above and check that <code>supabase/schema.sql</code> has been run.';
   return 'Save failed: ' + err.message;
 }
 
@@ -301,9 +301,9 @@ async function onExamUnlockedToggled(){
 document.getElementById('examUnlockedInput').addEventListener('change', onExamUnlockedToggled);
 
 /* =========================================================================
-   ☁️ Organiser sign-in (Firebase Auth) — the key that lets this panel WRITE.
-   The Firestore rules accept writes only from a signed-in user. Create the
-   one organiser account in Firebase Console → Authentication → Users.
+   ☁️ Organiser sign-in (Supabase Auth) — the key that lets this panel WRITE.
+   The RLS policies accept writes only from a signed-in user. Create the
+   one organiser account in Supabase → Authentication → Users.
    ========================================================================= */
 function renderCloudAuth(){
   const box = document.getElementById('cloudAuthBox');
@@ -357,7 +357,7 @@ async function cloudSignOut(){
 }
 
 /* =========================================================================
-   Questions  ·  প্রশ্ন ম্যানেজমেন্ট  (Firestore collection: questions)
+   Questions  ·  প্রশ্ন ম্যানেজমেন্ট  (Supabase table: questions)
    Add / edit / delete one question at a time — no more JSON textarea.
    ========================================================================= */
 let adminQuestionsCache = [];
@@ -385,7 +385,7 @@ async function loadAdminQuestions(){
 function renderAdminQList(){
   const body = document.getElementById('adminQListBody');
   if(!window.db.active){
-    body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;">⚠️ Firebase কনফিগার করা নেই — প্রশ্ন ডেটাবেসে সেভ হবে না। <code>firebase/SETUP.md</code> দেখো।</td></tr>';
+    body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;">⚠️ Supabase কনফিগার করা নেই — প্রশ্ন ডেটাবেসে সেভ হবে না। <code>supabase/SETUP.md</code> দেখো।</td></tr>';
     return;
   }
   if(adminQuestionsCache.length === 0){
@@ -481,8 +481,34 @@ async function deleteQuestionConfirm(id){
   }
 }
 
+/*
+ * One-time migration: push the bundled Bangla question set of the selected
+ * category into Supabase — but only while that category has zero rows, so
+ * clicking twice can never duplicate anything.
+ */
+async function importOldQuestions(){
+  if(!adminLoggedIn) return;
+  const msg = document.getElementById('adminQMsg');
+  const cat = document.getElementById('adminCatSelect').value;
+  const bundled = QUESTIONS[cat] || [];
+  if(bundled.length === 0){ msg.innerHTML = ''; return; }
+  msg.innerHTML = '<div class="small-note"><span class="bn">আনা হচ্ছে…</span><span class="en">Importing…</span></div>';
+  try{
+    const res = await window.db.importBundledQuestions(cat, bundled);
+    if(res.inserted > 0){
+      msg.innerHTML = '<div class="msg ok"><span class="bn">✅ ' + res.inserted + 'টি প্রশ্ন যোগ হয়েছে।</span><span class="en">✅ ' + res.inserted + ' questions imported.</span></div>';
+    }else{
+      msg.innerHTML = '<div class="msg ok"><span class="bn">এই ক্যাটাগরিতে ইতিমধ্যে ' + res.total + 'টি প্রশ্ন আছে — ডুপ্লিকেট এড়াতে কিছু যোগ করা হয়নি।</span><span class="en">This category already has ' + res.total + ' questions — nothing duplicated.</span></div>';
+    }
+    await loadAdminQuestions();
+  }catch(err){
+    console.error(err);
+    msg.innerHTML = '<div class="msg err"><span class="bn">' + writeErrorBn(err) + '</span><span class="en">' + writeErrorEn(err) + '</span></div>';
+  }
+}
+
 /* =========================================================================
-   Registrations  ·  রেজিস্ট্রেশন তালিকা  (Firestore collection: registrations)
+   Registrations  ·  রেজিস্ট্রেশন তালিকা  (Supabase table: registrations)
    ========================================================================= */
 let adminRegsCache = [];
 
@@ -492,10 +518,10 @@ async function loadAdminRegistrations(){
   const note = document.getElementById('regsSourceNote');
   if(note){
     if(window.db.active){
-      note.innerHTML = '<span class="bn">✅ Firebase Firestore — যেকোনো ডিভাইস থেকে করা রেজিস্ট্রেশন এখানে আসছে।</span><span class="en">✅ Firebase Firestore — registrations from every device land here.</span>';
+      note.innerHTML = '<span class="bn">✅ Supabase — যেকোনো ডিভাইস থেকে করা রেজিস্ট্রেশন এখানে আসছে।</span><span class="en">✅ Supabase — registrations from every device land here.</span>';
       note.style.color = 'var(--sage)';
     }else{
-      note.innerHTML = '<span class="bn">⚠️ Firebase কনফিগার করা নেই — রেজিস্ট্রেশন কোথাও সেভ হচ্ছে না। <code>src/shared/firebase-config.js</code> পূরণ করো।</span><span class="en">⚠️ Firebase is not configured — registrations are not being saved anywhere. Fill in <code>src/shared/firebase-config.js</code>.</span>';
+      note.innerHTML = '<span class="bn">⚠️ Supabase কনফিগার করা নেই — রেজিস্ট্রেশন কোথাও সেভ হচ্ছে না। <code>src/shared/supabase-config.js</code> পূরণ করো।</span><span class="en">⚠️ Supabase is not configured — registrations are not being saved anywhere. Fill in <code>src/shared/supabase-config.js</code>.</span>';
       note.style.color = 'var(--clay-dark)';
     }
   }
@@ -528,8 +554,9 @@ function renderAdminRegsTable(){
     const tr = document.createElement('tr');
     const catKey = rec.category || getCategoryKey(rec.cls);
     const catLabel = catKey && CATEGORY_LABELS[catKey] ? CATEGORY_LABELS[catKey].bn : (rec.cls || '');
-    const when = rec.createdAt && rec.createdAt.toDate
-      ? rec.createdAt.toDate().toLocaleDateString('en-GB') : '';
+    const whenRaw = rec.createdAt;
+    const when = typeof whenRaw === 'string' ? whenRaw.slice(0,10)
+      : (whenRaw && whenRaw.toDate ? whenRaw.toDate().toLocaleDateString('en-GB') : '');
     tr.innerHTML = '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + escapeHtml(rec.pid) + '</td>' +
       '<td>' + escapeHtml(rec.name) + '</td><td>' + escapeHtml(rec.school) + '</td><td>' + escapeHtml(catLabel) + '</td>' +
       '<td>' + escapeHtml(rec.area) + '</td><td>' + escapeHtml(rec.phone) + '</td><td>' + escapeHtml(rec.email) + '</td>' +

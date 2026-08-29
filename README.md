@@ -164,7 +164,7 @@ The gate is now a single field, `isUnlocked`, and **only a literal boolean
 | Situation | Result |
 | --- | --- |
 | Fresh browser, never seen the admin panel | 🔒 countdown |
-| Firestore document does not exist yet | 🔒 countdown |
+| The settings row does not exist yet | 🔒 countdown |
 | Offline, or the fetch failed | 🔒 countdown |
 | SDK blocked by a firewall / ad-blocker | 🔒 countdown |
 | `isUnlocked` is `"true"` (string), `1`, `null`, or missing | 🔒 countdown |
@@ -176,7 +176,7 @@ Two deliberate consequences:
 - **A passing date no longer opens the exam by itself.** The clock reaching
   25 Sep 2026 is not consent; an organiser flips the switch. This prevents a
   wrong date, or a visitor's wrong device clock, from opening the exam.
-- **Locking mid-exam takes effect immediately.** `onSnapshot` pushes the change
+- **Locking mid-exam takes effect immediately.** the realtime listener pushes the change
   and any in-progress attempt is torn down on every screen at once.
 
 The exam section also *starts* locked in the HTML, before any JavaScript runs,
@@ -185,96 +185,57 @@ so a slow network cannot flash the questions on screen.
 The দিন / ঘণ্টা / মিনিট / সেকেন্ড boxes, their colours and their element ids are
 untouched — only what drives them changed.
 
-### Turning on Firebase Firestore
-
-The exam lock syncs globally through Firestore: collection `settings`,
-document `examControl`.
-
-```
-settings/examControl
-  { isUnlocked: false, targetDate: "2026-09-25T00:00:00" }
-```
-
-1. Firebase Console → create a project → **Firestore Database** → Create.
-2. **Rules** → paste `firebase/firestore.rules` from this repo → Publish.
-   This is the part that actually protects you: the world may *read*
-   `examControl`, only a signed-in organiser may *write* it.
-3. **Authentication** → enable Email/Password → add ONE organiser account.
-   Do **not** allow public sign-up: anyone who can create an account can
-   satisfy `request.auth != null` and unlock the exam.
-4. Project settings → General → your web app → copy the config into
-   `FIREBASE` in `src/shared/config.js`.
-5. `npm run build`, then redeploy.
-
-`targetDate` is stored without a timezone offset, exactly as specified. Since
-Bangladesh has no DST, the app appends a fixed `+06:00` on read so the
-countdown shows the same remaining time in Dhaka and in London. A bare string
-would otherwise be parsed in each visitor's own timezone.
-
-Leave `FIREBASE.projectId` empty and nothing about Firebase loads — the site
-falls back to Supabase if configured, then to `localStorage`. **In every
-fallback the exam stays locked**, so a misconfiguration can never open it.
-
-Verify it: open the site in a browser that has never touched the admin panel.
-You must see the countdown. Then flip the master switch in the admin panel and
-watch that other browser open the exam within about a second, without a refresh.
-
-### localStorage or Supabase? — Supabase, and it is not close
-
-Your own reasoning was right, and the split into two deployments makes it
-decisive. localStorage is scoped to one **origin**, so a setting saved at
-`admin.yourdomain.com` is not merely "admin-only", it is *unreachable* from
-`yourdomain.com`. The public countdown would never change no matter what the
-organiser clicks. For a feature whose entire purpose is "one person changes it,
-everyone sees it", localStorage cannot work at all.
-
-Supabase over Firebase, for this project:
-
-- Row Level Security expresses exactly the rule you need — *everyone reads, one
-  signed-in organiser writes* — in two SQL policies, enforced by the server.
-- Supabase Auth replaces the fake `ADMIN_PASSWORD` constant with a real account,
-  so the admin gate stops being decorative.
-- Postgres means the registrations table can move to the same database later
-  with no second vendor.
-- It works from static HTML over a CDN script tag; no build step, no bundler.
-
-Firebase Realtime Database would also work; it is a reasonable second choice if
-your team already knows it. Vercel KV is ruled out — reaching it needs a server
-function, which this project deliberately does not have.
-
-**The code supports both today.** `src/shared/settings.js` has two backends and
-picks one at load time. With no configuration it uses localStorage and the admin
-panel prints a red warning saying the setting is not shared. Fill in
-`src/shared/config.js` and it switches to Supabase, with realtime push, and the
-warning turns green. Nothing else in the codebase changes.
-
 ### Turning on Supabase
 
-1. Create a free project at <https://supabase.com>.
-2. SQL Editor → paste [`supabase/schema.sql`](supabase/schema.sql) → **Run**.
-   It creates the `settings` table, seeds row 1, enables RLS with the two
-   policies, and adds the table to the realtime publication.
-3. Authentication → Users → **Add user**: one organiser email + strong password.
-4. Authentication → Providers → **turn email signups off**. Skip this and the
-   public can register themselves an account that is allowed to write.
-5. Project Settings → API → copy the Project URL and the anon/publishable key
-   into `src/shared/config.js`.
-6. `npm run build && npm test`, then commit and push. Vercel redeploys both
-   projects.
+The exam lock, questions, registrations and leaderboard all sync globally
+through Supabase (Postgres + Realtime). One row drives the gate:
+
+```
+settings (id = 'exam')
+  is_unlocked false, exam_date '2026-09-25T00:00:00+06',
+  registration_start '2026-08-25', registration_end '2026-09-20'
+```
+
+1. Supabase → new project (region: Southeast Asia / Singapore).
+2. **SQL Editor** → paste `supabase/schema.sql` from this repo → **Run**.
+   Tables, RLS policies, RPCs and the realtime publication are created in one
+   go. RLS is the part that actually protects you: the world may read and
+   register, only a signed-in organiser may flip the lock or edit questions.
+3. **Authentication → Users → Add user**: create ONE organiser account, and
+   keep public sign-ups off. Sign in with it in the admin panel's ☁️ box
+   before flipping the master switch.
+4. Project Settings → API: copy the Project URL and the **anon** key into
+   `src/shared/supabase-config.js`. (The anon key is safe in public JS — RLS
+   decides what it may do. The service_role key must never enter the repo.)
+5. `npm run build && npm test`, then commit and push; Vercel redeploys.
 
 Verify RLS actually holds before the event — the second command **must** fail:
 
 ```bash
-curl -s "$SUPABASE_URL/rest/v1/settings?select=*" -H "apikey: $ANON_KEY"
+curl -s "$SUPABASE_URL/rest/v1/settings?select=*" -H "apikey: $ANON_KEY"      # read: OK
 
-curl -s -X PATCH "$SUPABASE_URL/rest/v1/settings?id=eq.1" \
+curl -s -X PATCH "$SUPABASE_URL/rest/v1/settings?id=eq.exam" \
      -H "apikey: $ANON_KEY" -H "Content-Type: application/json" \
-     -d '{"timer_enabled": false}'
+     -d '{"is_unlocked":true}'                                                # write: 403
 ```
 
-Putting the anon key in public JavaScript is correct and expected: it only lets
-a browser *ask*, and RLS decides the answer. Never put the `service_role` key
-there — that one bypasses RLS entirely.
+Leave `SUPABASE_URL` empty and no third-party script loads at all — the site
+stays on fail-closed defaults and **the exam stays locked** in every
+fallback, so a misconfiguration can never open it.
+
+### Why Supabase (and not localStorage or Firebase)
+
+localStorage is scoped to one **origin** — for a feature whose entire purpose
+is "one person changes it, everyone sees it", it cannot work at all. Firebase
+would work, but this project is static with no build step, and Supabase
+gives us:
+
+- Row Level Security expressing exactly the rule we need — *everyone reads,
+  one signed-in organiser writes* — in SQL, enforced by the database itself.
+- Supabase Auth for the organiser account, so the admin write gate is real.
+- Postgres: registrations, questions, scores and settings live in one
+  database — one vendor, one dashboard.
+- A CDN script tag and client-side SDK only; static hosting stays static.
 
 ### Real-time updates
 

@@ -14,8 +14,8 @@
  *   - the session lives in sessionStorage, so closing the tab logs you out
  *   - credentials live in localStorage, so a changed password survives reloads
  *
- * Real access control needs a server. The Firestore rules
- * (firebase/firestore.rules) already restrict privileged writes to a signed-in
+ * Real access control needs a server. The Supabase RLS policies
+ * (supabase/schema.sql RLS policies) already restrict privileged writes to a signed-in
  * organiser; this local gate is just the first door.
  *
  * Storage keys
