@@ -167,6 +167,9 @@ function renderBackendNote(){
       '<span class="bn">✅ <strong>Supabase</strong> চালু — এখানে পরিবর্তন করলে <strong>সব ভিজিটরের</strong> ব্রাউজারে সঙ্গে সঙ্গে প্রতিফলিত হবে।</span>' +
       '<span class="en">✅ <strong>Supabase</strong> is live — changes here reach <strong>every visitor\'s</strong> browser instantly.</span>';
     note.style.color = 'var(--sage)';
+    if(window.db.windowSupported === false){
+      note.innerHTML += '<div class="small-note" style="margin-top:6px;color:var(--clay-dark);"><span class="bn">ℹ️ রেজিস্ট্রেশন-উইন্ডোর তারিখ কলাম ডেটাবেসে নেই — আপাতত ডিফল্ট (২৫ আগস্ট – ২০ সেপ্টেম্বর) চলছে। যোগ করতে <code>supabase/migrate-existing.sql</code> চালাও।</span><span class="en">ℹ️ The registration-window columns are missing — defaults (Aug 25 – Sep 20) are in use. Run <code>supabase/migrate-existing.sql</code> to add them.</span></div>';
+    }
   }else{
     note.innerHTML =
       '<span class="bn">⚠️ Supabase কনফিগার করা নেই — পরিবর্তন গ্লোবালি যাবে না। <code>src/shared/supabase-config.js</code> পূরণ করো (নির্দেশিকা: <code>supabase/SETUP.md</code>)।</span>' +

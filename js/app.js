@@ -90,20 +90,24 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
   btn.disabled = true;
   btn.innerHTML = '<span class="bn">জমা হচ্ছে…</span><span class="en">Submitting…</span>';
   try{
-    await window.db.addRegistration({
+    const saved = await window.db.addRegistration({
       pid:id, name, school, cls, area, phone, email,
       category: getCategoryKey(cls)
     });
+    // The database decides the real ID: the short UHF-xxx when the pid column
+    // exists, otherwise the generated uuid (draft schema) — always echo what
+    // was actually stored, so exam sign-in works either way.
+    const shownId = (saved && saved.pid) || id;
     // Cache our own ID locally (a convenience copy, never the source of truth).
-    try{ window.localStorage.setItem('uhf:myreg:'+id, JSON.stringify({pid:id,name})); }catch(e){ /* ignore */ }
+    try{ window.localStorage.setItem('uhf:myreg:'+shownId, JSON.stringify({pid:shownId,name})); }catch(e){ /* ignore */ }
     msgBox.innerHTML = `
       <div class="msg ok">
         <span class="bn">রেজিস্ট্রেশন সফল হয়েছে! তোমার আইডি সংরক্ষণ করে রাখো।</span>
         <span class="en">Registration successful! Save your ID below.</span>
       </div>
-      <div class="pid-box">${id}</div>`;
+      <div class="pid-box">${shownId}</div>`;
     document.getElementById('regForm').reset();
-    document.getElementById('examIdInput').value = id;
+    document.getElementById('examIdInput').value = shownId;
   }catch(err){
     console.error('[registration] failed:', (err && err.code) || '', err);
     const t = registrationErrorTexts(err);

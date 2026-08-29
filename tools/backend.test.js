@@ -290,6 +290,133 @@ function check(label, cond, detail) {
   check('signOut clears the session', (await db.auth.currentUser()) === null);
 
   stop();
+
+  // ---------------------------------------------------------------------
+  // Tolerance: the organiser's own draft schema — no pid/exam/category
+  // columns, no RPCs, leaderboard without score columns.
+  // ---------------------------------------------------------------------
+  console.log('\nsupabase-db — draft-schema tolerance\n');
+
+  const BARE_COLS = {
+    settings:      ['id', 'is_unlocked', 'exam_date', 'updated_at'],
+    questions:     ['id', 'question', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer', 'order_no', 'created_at'],
+    registrations: ['id', 'name', 'email', 'phone', 'institute', 'district', 'created_at'],
+    leaderboard:   ['pid', 'name', 'score']
+  };
+
+  function makeBareFake() {
+    const tables = { settings: new Map(), questions: new Map(), registrations: new Map(), leaderboard: new Map() };
+    let autoId = 0;
+    const missing = { code: '42703', message: 'column does not exist' };
+    function checkCols(table, cols) {
+      return (cols || []).some(function (c) { return BARE_COLS[table].indexOf(c) === -1; });
+    }
+    function builder(table, op, payload) {
+      const state = { filters: [], single: false, countOnly: false };
+      const b = {
+        select(cols, opts) {
+          state.cols = cols ? cols.split(',').map(function (c) { return c.trim(); }) : ['*'];
+          if (opts && opts.count === 'exact' && opts.head) state.countOnly = true;
+          return b;
+        },
+        insert(rows) { op = 'insert'; payload = rows; return b; },
+        upsert(rows) { op = 'upsert'; payload = rows; return b; },
+        update(patch) { op = 'update'; payload = patch; return b; },
+        delete() { op = 'delete'; payload = null; return b; },
+        eq(col, val) { state.filters.push([col, val]); return b; },
+        order() { return b; },
+        limit() { return b; },
+        maybeSingle() { state.single = true; return b; },
+        then(resolve, reject) { return Promise.resolve(run()).then(resolve, reject); }
+      };
+      function run() {
+        if (state.cols && state.cols.join(',') !== '*' && checkCols(table, state.cols)) return { data: null, error: missing };
+        if (state.filters.some(function (f) { return BARE_COLS[table].indexOf(f[0]) === -1; })) {
+          return { data: null, error: missing };
+        }
+        if (op === 'insert' || op === 'upsert') {
+          const rowsIn = Array.isArray(payload) ? payload : [payload];
+          for (const r of rowsIn) {
+            if (checkCols(table, Object.keys(r))) return { data: null, error: missing };
+          }
+          const stored = rowsIn.map(function (r) {
+            const id = r.id || ('a1b2c3d4-000' + (++autoId) + '-e5f6a7b8');   // uuid-shaped
+            const row = Object.assign({ id: id, created_at: '2026-01-01T00:00:00.000Z' }, r, { id: id });
+            tables[table].set(id, row);
+            return row;
+          });
+          return { data: stored, error: null };
+        }
+        let list = Array.from(tables[table].entries());
+        state.filters.forEach(function (f) {
+          list = list.filter(function (e) { return e[1][f[0]] === f[1]; });
+        });
+        if (op === 'select') {
+          if (state.countOnly) return { count: list.length, data: null, error: null };
+          const data = list.map(function (e) { return e[1]; });
+          return { data: state.single ? (data[0] || null) : data, error: null };
+        }
+        if (op === 'update') {
+          list.forEach(function (e) { Object.assign(e[1], payload); });
+          return { data: null, error: null };
+        }
+        return { data: null, error: null };
+      }
+      return b;
+    }
+    return {
+      from(t) { return builder(t, 'select', null); },
+      rpc() { return Promise.resolve({ data: null, error: { code: 'PGRST202', message: 'no matches were found in the schema cache' } }); },
+      channel() { return { on() { return this; }, subscribe() { return this; } }; },
+      removeChannel() {},
+      auth: {
+        getUser() { return Promise.resolve({ data: { user: null } }); },
+        signInWithPassword() { return Promise.resolve({ data: { user: { email: 'o@x.co' } } }); },
+        signOut() { return Promise.resolve({}); },
+        onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; }
+      }
+    };
+  }
+
+  global.window.SUPABASE_CONFIG = { SUPABASE_URL: 'https://bare.supabase.co', SUPABASE_ANON_KEY: 'anon-bare' };
+  global.window.supabase = { createClient: function () { return makeBareFake(); } };
+  delete require.cache[require.resolve('../src/shared/supabase-db.js')];
+  require('../src/shared/supabase-db.js');
+  const db2 = global.window.db;
+
+  let c2 = await db2.getControl();
+  check('draft: settings read works; window dates fall back to defaults',
+    c2.isUnlocked === false && c2.registrationStart === '2026-08-25', c2);
+  await db2.saveControl({ isUnlocked: true });
+  c2 = await db2.getControl();
+  check('draft: saveControl persists the unlock without window columns', c2.isUnlocked === true, c2);
+  check('draft: windowSupported reports false', db2.windowSupported === false);
+
+  const saved2 = await db2.addRegistration({
+    pid: 'UHF-BARE01', name: 'করিম', school: 'স্কুল', cls: 'প্রাইমারি: ৫ম',
+    area: 'রংপুর', phone: '01', email: '', category: 'primary'
+  });
+  check('draft: insert falls back and returns the uuid id as pid',
+    saved2 && saved2.pid && saved2.pid.indexOf('UHF-') === -1, saved2);
+  const got2 = await db2.findRegistration(saved2.pid);
+  check('draft: findRegistration by uuid works (rpc/pid columns missing)', got2 && got2.name === 'করিম');
+
+  let scoreErr = null;
+  try { await db2.saveExamResult(saved2.pid, { score: 10, maxScore: 10, timeTakenSec: 30, category: 'primary' }); }
+  catch (e) { scoreErr = e; }
+  check('draft: saveExamResult without score columns rejects with guidance', !!scoreErr);
+
+  await db2.saveQuestion('primary', {
+    question: 'প্রশ্ন?', optionA: 'ক', optionB: 'খ', optionC: 'গ', optionD: 'ঘ',
+    correctAnswer: 'A', order: 1
+  });
+  const qs2 = await db2.listQuestions('primary');
+  check('draft: questions save + list work without category column',
+    qs2.length === 1 && qs2[0].q_bn === 'প্রশ্ন?' && qs2[0].correct === 0);
+
+  check('draft: leaderboard read tolerates a reduced shape',
+    Array.isArray(await db2.listLeaderboard()));
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
 })();
