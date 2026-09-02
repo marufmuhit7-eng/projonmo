@@ -99,6 +99,15 @@
 
       <!-- Question management -->
       <div id="adminQuestions">
+        <!-- Sub-tabs: list/edit · Google Sheet sync · categories -->
+        <div class="tabs" style="margin-bottom:16px;">
+          <button class="tab-btn q-sub-btn active" onclick="showQSub('list')"><span class="bn">📝 তালিকা / সম্পাদনা</span><span class="en">📝 List / Edit</span></button>
+          <button class="tab-btn q-sub-btn" onclick="showQSub('sync')"><span class="bn">📄 প্রশ্ন আপলোড / Google Sheet সিঙ্ক</span><span class="en">📄 Sheet Sync</span></button>
+          <button class="tab-btn q-sub-btn" onclick="showQSub('cats')"><span class="bn">🗂 ক্যাটাগরি অনুযায়ী</span><span class="en">🗂 By Category</span></button>
+        </div>
+
+        <!-- ============ Sub-tab 1: list + add/edit ============ -->
+        <div id="qsubList">
         <div class="form-box" style="max-width:100%;">
           <label><span class="bn">ক্যাটাগরি বেছে নাও</span><span class="en">Choose Category</span></label>
           <select id="adminCatSelect" onchange="loadAdminQuestions()">
@@ -119,6 +128,10 @@
           <div style="border:1px solid var(--panel-border);border-radius:3px;padding:16px 18px;margin-top:16px;background:rgba(255,255,255,0.55);">
             <h4 style="margin:0;"><span class="bn">প্রশ্ন যোগ / সম্পাদনা</span><span class="en">Add / edit question</span></h4>
             <input type="hidden" id="qEditId">
+
+            <label style="margin-top:12px;"><span class="bn">ক্যাটাগরি *</span><span class="en">Category *</span></label>
+            <input id="qCategoryInput" list="qCategoryList" placeholder="primary" style="width:100%;max-width:280px;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);font-family:var(--f-mono);">
+            <datalist id="qCategoryList"><option value="primary"></option><option value="junior"></option><option value="senior"></option></datalist>
 
             <label style="margin-top:12px;"><span class="bn">প্রশ্ন (বাংলা) *</span><span class="en">Question (Bangla) *</span></label>
             <textarea id="qBnInput" rows="2" placeholder="যেমন: রংপুর বিভাগ কয়টি জেলা নিয়ে গঠিত?" style="width:100%;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);font-family:inherit;font-size:0.95rem;"></textarea>
@@ -159,17 +172,109 @@
           </div>
 
           <!-- ============ question list ============ -->
-          <div style="overflow-x:auto;margin-top:18px;">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:20px;">
+            <label style="margin:0;"><span class="bn">ক্যাটাগরি ফিল্টার</span><span class="en">Category filter</span></label>
+            <select id="qFilterCat" onchange="renderAdminQList()" style="padding:8px 12px;">
+              <option value="all">সব / all</option>
+            </select>
+            <span id="qCountNote" class="small-note" style="margin:0;"></span>
+          </div>
+          <div style="overflow-x:auto;margin-top:12px;">
             <table class="lb">
               <thead><tr>
                 <th>#</th><th><span class="bn">প্রশ্ন</span><span class="en">Question</span></th>
+                <th><span class="bn">ক্যাটাগরি</span><span class="en">Category</span></th>
                 <th><span class="bn">সঠিক</span><span class="en">Correct</span></th>
                 <th></th>
               </tr></thead>
-              <tbody id="adminQListBody"><tr><td colspan="4" style="text-align:center;padding:24px;">…</td></tr></tbody>
+              <tbody id="adminQListBody"><tr><td colspan="5" style="text-align:center;padding:24px;">…</td></tr></tbody>
             </table>
           </div>
         </div>
+        </div><!-- /qsubList -->
+
+        <!-- ============ Sub-tab 2: Google Sheet Sync ============ -->
+        <div id="qsubSync" class="hidden">
+        <div class="form-box" style="max-width:100%;">
+          <h3 style="margin-top:0;"><span class="bn">📄 প্রশ্ন আপলোড / Google Sheet সিঙ্ক</span><span class="en">📄 Google Sheet Sync</span></h3>
+          <p class="small-note bn" style="margin-top:0;">Google Sheet শেয়ার-লিংক দাও — CSV হিসেবে নিজেই নিয়ে নেবে। শিটটি <strong>“Anyone with the link → Viewer”</strong> করে শেয়ার করা থাকতে হবে।</p>
+          <p class="small-note en" style="margin-top:0;">Paste a Google Sheets share link — it is fetched as CSV automatically. The sheet must be shared as <strong>“Anyone with the link → Viewer”</strong>.</p>
+
+          <label><span class="bn">Google Sheet লিংক</span><span class="en">Google Sheet link</span></label>
+          <input type="url" id="sheetUrlInput" placeholder="https://docs.google.com/spreadsheets/d/…/edit#gid=0" style="width:100%;padding:12px;font-family:var(--f-mono);border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);">
+
+          <label style="margin-top:16px;"><span class="bn">ক্যাটাগরি মোড</span><span class="en">Category mode</span></label>
+          <select id="sheetCatMode" onchange="syncSheetCatModeChanged()">
+            <option value="sheet">Sheet-এর category কলাম ব্যবহার করো</option>
+            <option value="fixed">সব প্রশ্ন এই ক্যাটাগরিতে যাবে</option>
+          </select>
+          <div id="sheetFixedCatWrap" style="margin-top:10px;" hidden>
+            <label><span class="bn">ক্যাটাগরির নাম</span><span class="en">Category name</span></label>
+            <input id="sheetFixedCatInput" list="qCategoryList" placeholder="primary" style="width:100%;max-width:280px;padding:10px;font-family:var(--f-mono);border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);">
+          </div>
+
+          <label style="margin-top:16px;"><span class="bn">ইমপোর্ট মোড</span><span class="en">Import mode</span></label>
+          <select id="sheetImportMode">
+            <option value="append">নতুন প্রশ্ন যোগ করো (Append)</option>
+            <option value="replace_cat">এই ক্যাটাগরির পুরনো প্রশ্ন মুছে নতুন করে আপলোড করো (Replace category)</option>
+            <option value="replace_all">সব প্রশ্ন মুছে পুরো sheet দিয়ে রিপ্লেস করো (Replace all) ⚠️</option>
+          </select>
+
+          <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="sheetLoadBtn" onclick="loadSheetPreview()"><span class="bn">লিংক থেকে প্রশ্ন লোড করো</span><span class="en">Load from link</span></button>
+            <button class="btn btn-primary" id="sheetSyncBtn" onclick="applySheetImport()" disabled><span class="bn">সিঙ্ক করো / Sync Now</span><span class="en">Sync Now</span></button>
+          </div>
+          <div id="sheetStatus" style="margin-top:12px;"></div>
+
+          <!-- Preview -->
+          <div id="sheetPreviewWrap" class="hidden" style="margin-top:16px;">
+            <h4 style="margin:0 0 8px;"><span class="bn">প্রিভিউ</span><span class="en">Preview</span></h4>
+            <div style="overflow-x:auto;border:1px solid var(--panel-border);border-radius:2px;">
+              <table class="lb">
+                <thead><tr>
+                  <th><span class="bn">সারি</span><span class="en">Row</span></th>
+                  <th><span class="bn">ক্যাটাগরি</span><span class="en">Category</span></th>
+                  <th><span class="bn">প্রশ্ন</span><span class="en">Question</span></th>
+                  <th><span class="bn">সঠিক</span><span class="en">Correct</span></th>
+                  <th><span class="bn">ক্রম</span><span class="en">Order</span></th>
+                  <th><span class="bn">অবস্থা</span><span class="en">Status</span></th>
+                </tr></thead>
+                <tbody id="sheetPreviewBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="sheetResult" style="margin-top:14px;"></div>
+
+          <!-- Help: expected format -->
+          <details style="margin-top:18px;">
+            <summary class="small-note" style="cursor:pointer;"><span class="bn">📋 শিটের হেডার কেমন হবে? (নমুনা)</span><span class="en">📋 Expected sheet format (sample)</span></summary>
+            <div style="overflow-x:auto;margin-top:8px;">
+              <table class="lb">
+                <thead><tr><th>category</th><th>question</th><th>option_a</th><th>option_b</th><th>option_c</th><th>option_d</th><th>correct_answer</th><th>order_no</th></tr></thead>
+                <tbody>
+                  <tr><td style="font-family:var(--f-mono);">primary</td><td>রংপুর বিভাগ কয়টি জেলা নিয়ে গঠিত?</td><td>৬টি</td><td>৭টি</td><td>৮টি</td><td>৯টি</td><td style="font-family:var(--f-mono);">C</td><td style="font-family:var(--f-mono);">1</td></tr>
+                  <tr><td style="font-family:var(--f-mono);">junior</td><td>কান্তজিউ মন্দির কোন জেলায়?</td><td>দিনাজপুর</td><td>রংপুর</td><td>বগুড়া</td><td>রাজশাহী</td><td style="font-family:var(--f-mono);">A</td><td style="font-family:var(--f-mono);">2</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="small-note bn" style="margin-top:8px;">• হেডার বাংলাও চলে: ক্যাটাগরি, প্রশ্ন, অপশন_ক/খ/গ/ঘ, উত্তর, ক্রম &nbsp;• correct_answer: A/B/C/D, ক/খ/গ/ঘ, ১–৪, বা সঠিক অপশনের লেখা &nbsp;• প্রশ্ন + ৪টি অপশন আবশ্যক; খালি সারি বাদ যাবে &nbsp;• Google Docs লিংক নয় — শুধু Sheet।</p>
+            <p class="small-note en" style="margin-top:4px;">• Bangla headers work too • correct_answer accepts A–D, ক–ঘ, 1–4 or the option text • question + 4 options required; empty rows skipped • Google Docs links are not supported — Sheets only.</p>
+          </details>
+        </div>
+        </div><!-- /qsubSync -->
+
+        <!-- ============ Sub-tab 3: by category ============ -->
+        <div id="qsubCats" class="hidden">
+        <div class="form-box" style="max-width:100%;">
+          <h3 style="margin-top:0;"><span class="bn">🗂 ক্যাটাগরি অনুযায়ী ব্যবস্থাপনা</span><span class="en">🗂 Manage by category</span></h3>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 16px;">
+            <button class="btn btn-ghost" onclick="renderQCategories()"><span class="bn">রিফ্রেশ করো</span><span class="en">Refresh</span></button>
+            <button class="btn btn-ghost" style="color:var(--clay-dark);" onclick="deleteAllQuestionsConfirm()"><span class="bn">🗑 সব প্রশ্ন মুছে দাও</span><span class="en">🗑 Delete all</span></button>
+          </div>
+          <div id="qCatsBody"><tr><td style="text-align:center;padding:24px;">…</td></tr></div>
+        </div>
+        </div><!-- /qsubCats -->
       </div>
 
       <!-- ============ Exam timer control ============ -->
@@ -310,6 +415,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
 <script src="./js/supabase-config.js" defer></script>
 <script src="./js/supabase-db.js" defer></script>
+<script src="./js/sheet-import.js" defer></script>
 <script src="./js/config.js" defer></script>
 <script src="./js/settings.js" defer></script>
 <script src="./js/common.js" defer></script>

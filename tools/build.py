@@ -283,7 +283,7 @@ def main() -> None:
         (ROOT / sub).mkdir(parents=True, exist_ok=True)
 
     shutil.copy2(SRC / "shared" / "styles.css", ROOT / "css" / "styles.css")
-    for name in ("supabase-config.js", "supabase-db.js", "config.js", "settings.js", "common.js", "auth.js"):
+    for name in ("supabase-config.js", "supabase-db.js", "sheet-import.js", "config.js", "settings.js", "common.js", "auth.js"):
         shutil.copy2(SRC / "shared" / name, ROOT / "js" / name)
     shutil.copy2(SRC / "public" / "app.js", ROOT / "js" / "app.js")
     shutil.copy2(SRC / "admin" / "admin.js", ROOT / "js" / "admin.js")
@@ -304,7 +304,7 @@ def main() -> None:
     footer = (SRC / "shared" / "footer.html").read_text(encoding="utf-8").strip()
     (ROOT / "admin.html").write_text(
         page(ADMIN_HEAD, f"{ADMIN_NAV}\n\n{section}\n\n{footer}",
-             ["supabase-config.js", "supabase-db.js", "config.js", "settings.js", "common.js", "auth.js", "admin.js"], vendor),
+             ["supabase-config.js", "supabase-db.js", "sheet-import.js", "config.js", "settings.js", "common.js", "auth.js", "admin.js"], vendor),
         encoding="utf-8",
     )
 

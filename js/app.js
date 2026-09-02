@@ -250,11 +250,14 @@ window.addEventListener('pagehide', function(){
 });
 
 async function loadQuestionsForCategory(catKey){
-  // Supabase first; the bundled set is only a fallback for the categories
-  // the organiser has not filled in yet (or while Supabase is unconfigured).
+  // Supabase first: the participant's own category, then (if that category
+  // has no rows yet — e.g. imported sheet categories) every question mixed,
+  // ordered by category + order_no. The bundled set is the last fallback.
   try{
     const remote = await window.db.listQuestions(catKey);
     if(Array.isArray(remote) && remote.length>0) return remote;
+    const all = await window.db.listAllQuestions();
+    if(Array.isArray(all) && all.length>0) return all;
   }catch(err){ /* fall back below */ }
   return QUESTIONS[catKey];
 }

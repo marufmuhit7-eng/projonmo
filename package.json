@@ -11,9 +11,10 @@
   "scripts": {
     "build": "python3 tools/build.py",
     "dev": "python3 tools/serve.py",
-    "test": "node tools/settings.test.js && node tools/backend.test.js && node tools/auth.test.js && node tools/apps.test.js",
+    "test": "node tools/settings.test.js && node tools/backend.test.js && node tools/sheetimport.test.js && node tools/auth.test.js && node tools/apps.test.js",
     "test:settings": "node tools/settings.test.js",
     "test:backend": "node tools/backend.test.js",
+    "test:sheetimport": "node tools/sheetimport.test.js",
     "test:apps": "node tools/apps.test.js",
     "test:auth": "node tools/auth.test.js"
   },

@@ -51,11 +51,16 @@ create table if not exists public.questions (
   correct_answer text   not null default 'A'
                      check (correct_answer in ('A','B','C','D')),
   order_no      int     not null default 0,
-  created_at    timestamptz not null default now()
+  source        text,                            -- e.g. 'google_sheet'
+  source_url    text,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
 );
 
 create index if not exists questions_category_order_idx
   on public.questions (category, order_no);
+create index if not exists questions_category_idx
+  on public.questions (category);
 
 -- ------------------------------------------------------------- 3. registrations
 create table if not exists public.registrations (

@@ -361,9 +361,21 @@ async function cloudSignOut(){
 
 /* =========================================================================
    Questions  ·  প্রশ্ন ম্যানেজমেন্ট  (Supabase table: questions)
-   Add / edit / delete one question at a time — no more JSON textarea.
+   Sub-tabs: 📝 list/edit · 📄 Google Sheet sync · 🗂 by category
    ========================================================================= */
 let adminQuestionsCache = [];
+
+/* ---------- sub-tab switching ---------- */
+function showQSub(sub){
+  document.querySelectorAll('.q-sub-btn').forEach(b=>b.classList.remove('active'));
+  const map = { list:'qsubList', sync:'qsubSync', cats:'qsubCats' };
+  Object.keys(map).forEach(k=>document.getElementById(map[k]).classList.toggle('hidden', k!==sub));
+  const btns = document.querySelectorAll('.q-sub-btn');
+  if(sub==='list' && btns[0]) btns[0].classList.add('active');
+  if(sub==='sync' && btns[1]) btns[1].classList.add('active');
+  if(sub==='cats' && btns[2]) btns[2].classList.add('active');
+  if(sub==='cats') renderQCategories();
+}
 
 function escapeHtml(s){
   return String(s == null ? '' : s)
@@ -371,35 +383,75 @@ function escapeHtml(s){
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+/** Known categories = the three built-ins + whatever exists in the table. */
+function knownCategories(){
+  const found = new Set(['primary','junior','senior']);
+  adminQuestionsCache.forEach(q=>{ if(q.cat) found.add(q.cat); });
+  return Array.from(found);
+}
+
+/** The category a cached row belongs to (rows carry it as q.cat). */
+function rowCategory(q){
+  return q.cat || (document.getElementById('adminCatSelect') ? document.getElementById('adminCatSelect').value : 'primary');
+}
+
 async function loadAdminQuestions(){
   if(!adminLoggedIn) return;
-  const cat = document.getElementById('adminCatSelect').value;
   const body = document.getElementById('adminQListBody');
-  body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;">… লোড হচ্ছে</td></tr>';
+  body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;">… লোড হচ্ছে</td></tr>';
   try{
-    adminQuestionsCache = await window.db.listQuestions(cat);
+    // Load EVERYTHING once; the dropdown filters client-side.
+    adminQuestionsCache = await window.db.listAllQuestions();
+    buildFilterOptions();
     renderAdminQList();
   }catch(err){
     console.error(err);
-    body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;">লোড করা যায়নি — ' + escapeHtml(err.message) + '</td></tr>';
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;">লোড করা যায়নি — ' + escapeHtml(err.message) + '</td></tr>';
   }
+}
+
+/** Alias used across the panel after mutations. */
+const loadAdminQuestionsRaw = loadAdminQuestions;
+
+function buildFilterOptions(){
+  const sel = document.getElementById('qFilterCat');
+  if(!sel) return;
+  const current = sel.value || 'all';
+  const counts = {};
+  adminQuestionsCache.forEach(q=>{ const c = q.cat || '(নেই)'; counts[c] = (counts[c]||0)+1; });
+  sel.innerHTML = '<option value="all">সব / all (' + adminQuestionsCache.length + ')</option>';
+  Object.keys(counts).sort().forEach(c=>{
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c + ' (' + counts[c] + ')';
+    sel.appendChild(o);
+  });
+  if(Array.from(sel.options).some(o=>o.value===current)) sel.value = current;
+  const note = document.getElementById('qCountNote');
+  if(note) note.textContent = '';
+  // keep the datalist for the forms in sync too
+  const dl = document.getElementById('qCategoryList');
+  if(dl) dl.innerHTML = knownCategories().map(c=>'<option value="'+escapeHtml(c)+'"></option>').join('');
 }
 
 function renderAdminQList(){
   const body = document.getElementById('adminQListBody');
+  const sel = document.getElementById('qFilterCat');
+  const filter = sel ? sel.value : 'all';
   if(!window.db.active){
-    body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;">⚠️ Supabase কনফিগার করা নেই — প্রশ্ন ডেটাবেসে সেভ হবে না। <code>supabase/SETUP.md</code> দেখো।</td></tr>';
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;">⚠️ Supabase কনফিগার করা নেই — প্রশ্ন ডেটাবেসে সেভ হবে না। <code>supabase/SETUP.md</code> দেখো।</td></tr>';
     return;
   }
-  if(adminQuestionsCache.length === 0){
-    body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;">এই ক্যাটাগরিতে এখনো কোনো প্রশ্ন নেই — উপরের ফর্ম থেকে যোগ করো। (পরীক্ষায় ততক্ষণ বিল্ট-ইন নমুনা প্রশ্নই দেখাবে।)</td></tr>';
+  const rows = adminQuestionsCache.filter(q => filter==='all' || (q.cat||'(নেই)')===filter);
+  if(rows.length === 0){
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;">এই ফিল্টারে কোনো প্রশ্ন নেই। (পরীক্ষায় ক্যাটাগরির প্রশ্ন না থাকলে বিল্ট-ইন নমুনা প্রশ্নই দেখাবে; 📄 Sheet সিঙ্ক ট্যাব থেকে আমদানি করো।)</td></tr>';
     return;
   }
   body.innerHTML = '';
-  adminQuestionsCache.forEach(function(q, i){
+  rows.forEach(function(q, i){
     const tr = document.createElement('tr');
     tr.innerHTML = '<td>' + (i+1) + '</td>' +
       '<td style="max-width:420px;"><span class="bn">' + escapeHtml(q.q_bn) + '</span><span class="en" style="color:rgba(36,28,21,0.6);">' + escapeHtml(q.q_en) + '</span></td>' +
+      '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + escapeHtml(q.cat || '(নেই)') + '</td>' +
       '<td>' + 'কখগঘ'[q.correct] + ' (' + 'ABCD'[q.correct] + ')</td>' +
       '<td style="white-space:nowrap;">' +
         '<button class="btn btn-ghost" style="padding:4px 10px;font-size:0.8rem;" onclick="editQuestion(\'' + q.id + '\')"><span class="bn">✏️ সম্পাদনা</span><span class="en">Edit</span></button> ' +
@@ -415,6 +467,8 @@ function resetQuestionForm(){
     document.getElementById(id).value = '';
   });
   document.getElementById('qCorrectInput').value = 'A';
+  const catInput = document.getElementById('qCategoryInput');
+  if(catInput && !catInput.value) catInput.value = document.getElementById('adminCatSelect').value;
   const nextOrder = adminQuestionsCache.length + 1;
   document.getElementById('qOrderInput').value = nextOrder;
 }
@@ -431,14 +485,18 @@ function editQuestion(id){
   }
   document.getElementById('qCorrectInput').value = 'ABCD'[q.correct];
   document.getElementById('qOrderInput').value = q.order || 1;
+  const catInput = document.getElementById('qCategoryInput');
+  if(catInput) catInput.value = q.cat || document.getElementById('adminCatSelect').value;
   document.getElementById('adminQMsg').innerHTML = '';
+  showQSub('list');
   window.scrollTo({top: document.getElementById('adminQuestions').offsetTop - 80, behavior:'smooth'});
 }
 
 async function saveQuestionForm(){
   if(!adminLoggedIn) return;
   const msg = document.getElementById('adminQMsg');
-  const cat = document.getElementById('adminCatSelect').value;
+  const catInput = document.getElementById('qCategoryInput');
+  const cat = (catInput && catInput.value.trim()) || document.getElementById('adminCatSelect').value;
   msg.innerHTML = '';
   const q = {
     question: document.getElementById('qBnInput').value.trim(),
@@ -463,7 +521,8 @@ async function saveQuestionForm(){
     await window.db.saveQuestion(cat, q, editId || null);
     msg.innerHTML = '<div class="msg ok"><span class="bn">✅ প্রশ্ন সংরক্ষণ হয়েছে!</span><span class="en">✅ Question saved!</span></div>';
     resetQuestionForm();
-    await loadAdminQuestions();
+    catInput.value = cat;
+    await loadAdminQuestionsRaw();
   }catch(err){
     console.error(err);
     msg.innerHTML = '<div class="msg err"><span class="bn">' + writeErrorBn(err) + '</span><span class="en">' + writeErrorEn(err) + '</span></div>';
@@ -477,7 +536,7 @@ async function deleteQuestionConfirm(id){
   try{
     await window.db.deleteQuestion(id);
     document.getElementById('adminQMsg').innerHTML = '<div class="msg ok"><span class="bn">প্রশ্ন মুছে গেছে।</span><span class="en">Question deleted.</span></div>';
-    await loadAdminQuestions();
+    await loadAdminQuestionsRaw();
   }catch(err){
     console.error(err);
     document.getElementById('adminQMsg').innerHTML = '<div class="msg err"><span class="bn">' + writeErrorBn(err) + '</span><span class="en">' + writeErrorEn(err) + '</span></div>';
@@ -503,10 +562,296 @@ async function importOldQuestions(){
     }else{
       msg.innerHTML = '<div class="msg ok"><span class="bn">এই ক্যাটাগরিতে ইতিমধ্যে ' + res.total + 'টি প্রশ্ন আছে — ডুপ্লিকেট এড়াতে কিছু যোগ করা হয়নি।</span><span class="en">This category already has ' + res.total + ' questions — nothing duplicated.</span></div>';
     }
-    await loadAdminQuestions();
+    await loadAdminQuestionsRaw();
   }catch(err){
     console.error(err);
     msg.innerHTML = '<div class="msg err"><span class="bn">' + writeErrorBn(err) + '</span><span class="en">' + writeErrorEn(err) + '</span></div>';
+  }
+}
+
+/* ---------- 🗂 by-category management ---------- */
+async function renderQCategories(){
+  const body = document.getElementById('qCatsBody');
+  if(!body) return;
+  body.innerHTML = '… লোড হচ্ছে';
+  try{
+    if(adminQuestionsCache.length === 0) await loadAdminQuestionsRaw();
+    const counts = {};
+    adminQuestionsCache.forEach(q=>{ const c = q.cat || '(নেই)'; counts[c] = (counts[c]||0)+1; });
+    const cats = Object.keys(counts).sort();
+    if(cats.length === 0){
+      body.innerHTML = '<p class="small-note" style="margin:0;">এখনো কোনো প্রশ্ন নেই — 📄 Sheet সিঙ্ক ট্যাব থেকে আমদানি করো।</p>';
+      return;
+    }
+    let html = '<div style="overflow-x:auto;"><table class="lb"><thead><tr>' +
+      '<th><span class="bn">ক্যাটাগরি</span><span class="en">Category</span></th>' +
+      '<th><span class="bn">প্রশ্ন</span><span class="en">Questions</span></th><th></th></tr></thead><tbody>';
+    cats.forEach(c=>{
+      html += '<tr><td style="font-family:var(--f-mono);">' + escapeHtml(c) + '</td><td>' + counts[c] + '</td>' +
+        '<td style="white-space:nowrap;">' +
+        '<button class="btn btn-ghost" style="padding:4px 10px;font-size:0.8rem;" onclick="filterToCategory(\'' + escapeHtml(c) + '\')"><span class="bn">দেখো</span><span class="en">View</span></button> ' +
+        '<button class="btn btn-ghost" style="padding:4px 10px;font-size:0.8rem;color:var(--clay-dark);" onclick="deleteCategoryConfirm(\'' + escapeHtml(c) + '\',' + counts[c] + ')"><span class="bn">🗑 মুছো</span><span class="en">Delete</span></button>' +
+        '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    body.innerHTML = html;
+  }catch(err){
+    console.error(err);
+    body.innerHTML = '<p class="small-note" style="margin:0;color:var(--clay-dark);">লোড করা যায়নি — ' + escapeHtml(err.message) + '</p>';
+  }
+}
+
+function filterToCategory(cat){
+  showQSub('list');
+  const sel = document.getElementById('qFilterCat');
+  if(sel) sel.value = cat;
+  renderAdminQList();
+}
+
+async function deleteCategoryConfirm(cat, count){
+  const ok = window.confirm('“' + cat + '” ক্যাটাগরির ' + count + 'টি প্রশ্ন মুছে ফেলবে? ফিরিয়ে আনা যাবে না!\n\nDelete all ' + count + ' questions in “' + cat + '”?');
+  if(!ok) return;
+  try{
+    await window.db.deleteQuestionsByCategory(cat);
+    await loadAdminQuestionsRaw();
+    renderQCategories();
+  }catch(err){
+    console.error(err);
+    window.alert(writeErrorBn(err));
+  }
+}
+
+async function deleteAllQuestionsConfirm(){
+  const total = adminQuestionsCache.length;
+  const ok = window.confirm('⚠️ সব প্রশ্ন (' + total + 'টি) মুছে ফেলবে? ফিরিয়ে আনা যাবে না!\n\nDelete ALL ' + total + ' questions?');
+  if(!ok) return;
+  try{
+    await window.db.deleteAllQuestions();
+    await loadAdminQuestionsRaw();
+    renderQCategories();
+  }catch(err){
+    console.error(err);
+    window.alert(writeErrorBn(err));
+  }
+}
+
+/* =========================================================================
+   📄 Google Sheet Sync  ·  প্রশ্ন আপলোড
+   Two steps: loadSheetPreview() fetches+parses+validates and paints a
+   preview; applySheetImport() performs the chosen import mode.
+   ========================================================================= */
+let sheetPreviewData = null;   // { items, errors, csvUrl }
+
+function syncSheetCatModeChanged(){
+  const mode = document.getElementById('sheetCatMode').value;
+  document.getElementById('sheetFixedCatWrap').hidden = (mode !== 'fixed');
+}
+
+function setSheetStatus(html, tone){
+  const el = document.getElementById('sheetStatus');
+  el.innerHTML = html ? '<div class="' + (tone === 'err' ? 'msg err' : tone === 'ok' ? 'msg ok' : 'small-note') + '">' + html + '</div>' : '';
+}
+
+async function fetchCsvText(url){
+  const res = await fetch(url, { redirect: 'follow' });
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  if(/^\s*<!DOCTYPE html|^\s*<html/i.test(text)) throw new Error('HTML returned — শিটটি শেয়ার করা নেই');
+  return text;
+}
+
+async function loadSheetPreview(){
+  if(!adminLoggedIn) return;
+  const msg = document.getElementById('sheetStatus');
+  const btn = document.getElementById('sheetLoadBtn');
+  const syncBtn = document.getElementById('sheetSyncBtn');
+  const resultEl = document.getElementById('sheetResult');
+  const previewWrap = document.getElementById('sheetPreviewWrap');
+  resultEl.innerHTML = '';
+  previewWrap.classList.add('hidden');
+  sheetPreviewData = null;
+  syncBtn.disabled = true;
+
+  const SI = window.sheetImport;
+  if(!SI){ setSheetStatus('<span class="bn">sheet-import.js লোড হয়নি — পেজ রিফ্রেশ করো।</span>','err'); return; }
+
+  const url = document.getElementById('sheetUrlInput').value.trim();
+  const mapped = SI.sheetUrlToCsv(url);
+  if(mapped.error === 'docs'){
+    setSheetStatus('<span class="bn">Google Docs সরাসরি সাপোর্ট নয়। প্রশ্ন Google Sheet ফরম্যাটে দিন (নিচের নমুনা হেডার দেখো)।</span><span class="en">Google Docs is not supported — paste a Google Sheets link.</span>','err');
+    return;
+  }
+  if(mapped.error === 'invalid' || !mapped.csvUrl){
+    setSheetStatus('<span class="bn">এটি Google Sheet লিংক নয়। যেমন: https://docs.google.com/spreadsheets/d/…/edit</span><span class="en">That is not a Google Sheets link.</span>','err');
+    return;
+  }
+
+  const catMode = document.getElementById('sheetCatMode').value;
+  const fixedCat = document.getElementById('sheetFixedCatInput').value.trim();
+  if(catMode === 'fixed' && !fixedCat){
+    setSheetStatus('<span class="bn">ক্যাটাগরির নাম লিখো।</span><span class="en">Enter the category name.</span>','err');
+    return;
+  }
+
+  btn.disabled = true;
+  const original = btn.innerHTML;
+  btn.innerHTML = '<span class="bn">লিংক থেকে প্রশ্ন লোড হচ্ছে…</span><span class="en">Loading…</span>';
+  setSheetStatus('<span class="bn">লিংক থেকে প্রশ্ন লোড হচ্ছে...</span><span class="en">Loading questions from the link…</span>');
+  try{
+    let text;
+    try{
+      text = await fetchCsvText(mapped.csvUrl);
+    }catch(e1){
+      console.error('[sheet-sync] export endpoint failed, trying gviz', e1);
+      text = await fetchCsvText(mapped.fallbackUrl);
+    }
+    const rows = SI.parseCsv(text);
+    if(rows.length < 2){
+      setSheetStatus('<span class="bn">শিটে কোনো সারি পাওয়া যায়নি।</span><span class="en">No data rows found in the sheet.</span>','err');
+      return;
+    }
+    const hmap = SI.mapHeaders(rows[0]);
+    const validated = SI.validateRows(rows, hmap, {
+      categoryMode: catMode,
+      fixedCategory: fixedCat
+    });
+
+    sheetPreviewData = {
+      items: validated.items,
+      errors: validated.errors,
+      csvUrl: mapped.csvUrl
+    };
+    renderSheetPreview(validated);
+    if(validated.items.length > 0){
+      syncBtn.disabled = false;
+      setSheetStatus('<span class="bn">প্রিভিউ তৈরি হয়েছে — বৈধ ' + validated.items.length + 'টি' +
+        (validated.errors.length ? ', ভুল ' + validated.errors.length + 'টি। ভুল সারিগুলো বাদেই সিঙ্ক হবে।' : '।') +
+        '</span><span class="en">Preview ready — ' + validated.items.length + ' valid' +
+        (validated.errors.length ? ', ' + validated.errors.length + ' with errors (they will be skipped).' : '.') + '</span>','ok');
+    }else{
+      setSheetStatus('<span class="bn">কিছু সারিতে ভুল আছে, আবার চেক করুন — একটি বৈধ সারিও পাওয়া যায়নি।</span><span class="en">Every row has errors — please check again.</span>','err');
+    }
+  }catch(err){
+    console.error('[sheet-sync] fetch failed', err);
+    setSheetStatus('<span class="bn">শিট আনা যায়নি: ' + escapeHtml(err.message) + '। শিটটি “Anyone with the link → Viewer” করে শেয়ার করা আছে কি না দেখো।</span><span class="en">Could not fetch the sheet: ' + escapeHtml(err.message) + '. Check that it is shared as “Anyone with the link → Viewer”.</span>','err');
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
+}
+
+function renderSheetPreview(validated){
+  const wrap = document.getElementById('sheetPreviewWrap');
+  const body = document.getElementById('sheetPreviewBody');
+  const MAX_SHOW = 20;
+  const errorRows = {};
+  validated.errors.forEach(e=>{ errorRows[e.row] = e.reason; });
+  const itemRows = {};
+  validated.items.forEach(it=>{ itemRows[it._row] = it; });
+
+  // rebuild: walk sheet rows in order, marking valid/invalid
+  let html = '';
+  let shown = 0;
+  validated.items.forEach(function(it){
+    if(shown >= MAX_SHOW) return;
+    shown++;
+    html += '<tr><td style="font-family:var(--f-mono);">' + it._row + '</td>' +
+      '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + escapeHtml(it.category) + '</td>' +
+      '<td style="max-width:360px;">' + escapeHtml(it.question) + '</td>' +
+      '<td>' + it.correct_answer + '</td><td style="font-family:var(--f-mono);">' + it.order_no + '</td>' +
+      '<td>✅</td></tr>';
+  });
+  Object.keys(errorRows).forEach(function(rowNo){
+    if(shown >= MAX_SHOW) return;
+    shown++;
+    html += '<tr style="background:rgba(166,70,30,0.06);"><td style="font-family:var(--f-mono);">' + rowNo + '</td>' +
+      '<td colspan="4"><span class="bn">সারি ' + rowNo + ': ' + escapeHtml(errorRows[rowNo]) + '</span></td>' +
+      '<td>❌</td></tr>';
+  });
+  if(validated.items.length + validated.errors.length > MAX_SHOW){
+    html += '<tr><td colspan="6" style="text-align:center;">… আরো ' + (validated.items.length + validated.errors.length - MAX_SHOW) + 'টি সারি</td></tr>';
+  }
+  body.innerHTML = html || '<tr><td colspan="6" style="text-align:center;padding:18px;">কিছু নেই</td></tr>';
+  wrap.classList.remove('hidden');
+}
+
+async function applySheetImport(){
+  if(!adminLoggedIn || !sheetPreviewData) return;
+  const syncBtn = document.getElementById('sheetSyncBtn');
+  const resultEl = document.getElementById('sheetResult');
+  const mode = document.getElementById('sheetImportMode').value;
+  const catMode = document.getElementById('sheetCatMode').value;
+  const fixedCat = document.getElementById('sheetFixedCatInput').value.trim();
+  const sourceUrl = document.getElementById('sheetUrlInput').value.trim();
+
+  if(sheetPreviewData.items.length === 0){
+    setSheetStatus('<span class="bn">কিছু সারিতে ভুল আছে, আবার চেক করুন — আমদানি করার মতো বৈধ সারি নেই।</span>','err');
+    return;
+  }
+
+  const rows = sheetPreviewData.items.map(it => Object.assign({}, it, {
+    source: 'google_sheet',
+    source_url: sourceUrl
+  }));
+
+  // Confirmations for destructive modes
+  if(mode === 'replace_cat'){
+    const cats = Array.from(new Set(rows.map(r=>r.category)));
+    const catText = catMode === 'fixed' ? fixedCat : cats.join(', ');
+    const ok = window.confirm('নিচের ক্যাটাগরির সব পুরনো প্রশ্ন মুছে যাবে, তারপর নতুন ' + rows.length + 'টি বসবে:\n' + catText + '\n\nচালিয়ে যাবে?');
+    if(!ok) return;
+  }
+  if(mode === 'replace_all'){
+    let total = 0;
+    try{ total = (await window.db.listAllQuestions()).length; }catch(e){ /* unknown count */ }
+    const ok = window.confirm('⚠️ ডেটাবেসের সব প্রশ্ন (' + total + 'টি) মুছে পুরো শিটের ' + rows.length + 'টি প্রশ্ন বসানো হবে। ফিরিয়ে আনা যাবে না!\n\nReplace ALL questions?');
+    if(!ok) return;
+  }
+
+  syncBtn.disabled = true;
+  const original = syncBtn.innerHTML;
+  syncBtn.innerHTML = '<span class="bn">সিঙ্ক হচ্ছে…</span><span class="en">Syncing…</span>';
+  try{
+    // 1) delete per mode
+    if(mode === 'replace_cat'){
+      const cats = Array.from(new Set(rows.map(r=>r.category)));
+      for(const c of cats) await window.db.deleteQuestionsByCategory(c);
+    }else if(mode === 'replace_all'){
+      await window.db.deleteAllQuestions();
+    }
+
+    // 2) duplicate guard in append mode: skip (category, question) already present
+    let duplicates = 0;
+    let toInsert = rows;
+    if(mode === 'append'){
+      let existing = [];
+      try{ existing = await window.db.listAllQuestions(); }catch(e){ console.error(e); }
+      const seen = new Set(existing.map(q => (q.cat || '') + '::' + q.q_bn));
+      toInsert = rows.filter(r => {
+        const key = r.category + '::' + r.question;
+        if(seen.has(key)){ duplicates++; return false; }
+        return true;
+      });
+    }
+
+    // 3) insert
+    const inserted = await window.db.bulkInsertQuestions(toInsert);
+
+    const failed = sheetPreviewData.errors.length;
+    resultEl.innerHTML = '<div class="msg ok"><span class="bn">✅ সফলভাবে সিঙ্ক হয়েছে! যোগ হয়েছে ' + inserted + 'টি' +
+      (duplicates ? ', ডুপ্লিকেট স্কিপ ' + duplicates + 'টি' : '') +
+      (failed ? ', ভুল সারি (স্কিপ) ' + failed + 'টি' : '') + '।</span>' +
+      '<span class="en">✅ Sync complete! Inserted ' + inserted +
+      (duplicates ? ', skipped ' + duplicates + ' duplicates' : '') +
+      (failed ? ', skipped ' + failed + ' invalid rows' : '') + '.</span></div>';
+    await loadAdminQuestionsRaw();
+    renderQCategories();
+  }catch(err){
+    console.error('[sheet-sync] import failed', err);
+    resultEl.innerHTML = '<div class="msg err"><span class="bn">' + writeErrorBn(err) + '</span><span class="en">' + writeErrorEn(err) + '</span></div>';
+  }finally{
+    syncBtn.disabled = false;
+    syncBtn.innerHTML = original;
   }
 }
 

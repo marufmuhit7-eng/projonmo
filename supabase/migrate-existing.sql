@@ -34,10 +34,16 @@ alter table public.questions
   add column if not exists option_a_en   text default '',
   add column if not exists option_b_en   text default '',
   add column if not exists option_c_en   text default '',
-  add column if not exists option_d_en   text default '';
+  add column if not exists option_d_en   text default '',
+  -- Google Sheet ইমপোর্টারের জন্য
+  add column if not exists source        text,
+  add column if not exists source_url    text,
+  add column if not exists updated_at    timestamptz not null default now();
 
 create index if not exists questions_category_order_idx
   on public.questions (category, order_no);
+create index if not exists questions_category_idx
+  on public.questions (category);
 
 -- 4) leaderboard: VIEW-এর বদলে টেবিল (RPC-ই লিখবে; ফোন/ইমেইল থাকে না) ------
 drop view if exists public.leaderboard;

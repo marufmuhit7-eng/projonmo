@@ -172,6 +172,7 @@
   function rowToQuestion(r) {
     return {
       id: r.id,
+      cat: r.category || '',
       q_bn: r.question || '',
       q_en: r.question_en || r.question || '',
       opts_bn: [r.option_a, r.option_b, r.option_c, r.option_d],
@@ -247,6 +248,97 @@
     return client.from('questions').delete().eq('id', id).then(function (res) {
       if (res.error) throw res.error;
     });
+  }
+
+  /** Everything, ordered by category then order_no (exam fallback + admin). */
+  function listAllQuestions() {
+    if (!active) return Promise.resolve([]);
+    return client.from('questions').select(Q_COLS).order('category', { ascending: true })
+      .order('order_no', { ascending: true })
+      .then(function (res) {
+        if (res.error && missingColumn(res.error)) {
+          return client.from('questions').select('*').order('order_no', { ascending: true })
+            .then(function (r2) {
+              if (r2.error) {
+                console.error('[supabase-db] questions read failed — falling back to the bundled set.', r2.error);
+                return [];
+              }
+              return (r2.data || []).map(rowToQuestion);
+            });
+        }
+        if (res.error) {
+          console.error('[supabase-db] questions read failed — falling back to the bundled set.', res.error);
+          return [];
+        }
+        return (res.data || []).map(rowToQuestion);
+      });
+  }
+
+  /** Bulk insert for the sheet importer — chunked, schema-tolerant. */
+  function bulkInsertQuestions(rows) {
+    if (!active) return Promise.reject(new Error('Supabase কনফিগার করা নেই'));
+    var list = rows || [];
+    if (list.length === 0) return Promise.resolve(0);
+
+    function core(r) {
+      return {
+        question: r.question, option_a: r.option_a, option_b: r.option_b,
+        option_c: r.option_c, option_d: r.option_d,
+        correct_answer: r.correct_answer, order_no: r.order_no
+      };
+    }
+    function full(r) {
+      return Object.assign(core(r), {
+        category: r.category, question_en: r.question_en || '',
+        option_a_en: r.option_a_en || '', option_b_en: r.option_b_en || '',
+        option_c_en: r.option_c_en || '', option_d_en: r.option_d_en || '',
+        source: r.source || null, source_url: r.source_url || null,
+        updated_at: new Date().toISOString()
+      });
+    }
+    function insertChunk(chunkRows, map) {
+      return client.from('questions').insert(chunkRows.map(map)).then(function (res) {
+        if (res.error) throw res.error;
+      });
+    }
+
+    var CHUNK = 100;
+    var chunks = [];
+    for (var i = 0; i < list.length; i += CHUNK) chunks.push(list.slice(i, i + CHUNK));
+
+    var inserted = 0;
+    var bare = false;   // draft schema: drop the extended columns
+    return chunks.reduce(function (p, chunk) {
+      return p.then(function () {
+        return insertChunk(chunk, bare ? core : full).catch(function (err) {
+          if (!bare && missingColumn(err)) {
+            bare = true;
+            return insertChunk(chunk, core);
+          }
+          throw err;
+        }).then(function () { inserted += chunk.length; });
+      });
+    }, Promise.resolve()).then(function () { return inserted; });
+  }
+
+  /** Remove every question of one category (sheet "replace category" mode). */
+  function deleteQuestionsByCategory(cat) {
+    if (!active) return Promise.reject(new Error('Supabase কনফিগার করা নেই'));
+    return client.from('questions').delete().eq('category', cat).then(function (res) {
+      if (res.error) {
+        if (missingColumn(res.error)) {
+          throw new Error('questions টেবিলে category কলাম নেই — আগে supabase/migrate-existing.sql চালাও');
+        }
+        throw res.error;
+      }
+    });
+  }
+
+  /** Remove every question (sheet "replace all" mode). DANGER. */
+  function deleteAllQuestions() {
+    if (!active) return Promise.reject(new Error('Supabase কনফিগার করা নেই'));
+    return client.from('questions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      .then(function (res) { if (res.error) throw res.error; });
   }
 
   /**
@@ -496,8 +588,12 @@
     saveControl: saveControl,
     onControl: onControl,
     listQuestions: listQuestions,
+    listAllQuestions: listAllQuestions,
     saveQuestion: saveQuestion,
     deleteQuestion: deleteQuestion,
+    bulkInsertQuestions: bulkInsertQuestions,
+    deleteQuestionsByCategory: deleteQuestionsByCategory,
+    deleteAllQuestions: deleteAllQuestions,
     importBundledQuestions: importBundledQuestions,
     addRegistration: addRegistration,
     findRegistration: findRegistration,
