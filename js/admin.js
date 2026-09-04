@@ -905,7 +905,7 @@ function renderAdminRegsTable(){
     const whenRaw = rec.createdAt;
     const when = typeof whenRaw === 'string' ? whenRaw.slice(0,10)
       : (whenRaw && whenRaw.toDate ? whenRaw.toDate().toLocaleDateString('en-GB') : '');
-    tr.innerHTML = '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + escapeHtml(rec.pid) + '</td>' +
+    tr.innerHTML = '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + (rec.pid ? escapeHtml(rec.pid) : '—') + '</td>' +
       '<td>' + escapeHtml(rec.name) + '</td><td>' + escapeHtml(rec.school) + '</td><td>' + escapeHtml(catLabel) + '</td>' +
       '<td>' + escapeHtml(rec.area) + '</td><td>' + escapeHtml(rec.phone) + '</td><td>' + escapeHtml(rec.email) + '</td>' +
       '<td>' + (rec.examTaken ? '✅ ' + escapeHtml(when) : '—') + '</td>' +

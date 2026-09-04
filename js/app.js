@@ -102,8 +102,8 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
     try{ window.localStorage.setItem('uhf:myreg:'+shownId, JSON.stringify({pid:shownId,name})); }catch(e){ /* ignore */ }
     msgBox.innerHTML = `
       <div class="msg ok">
-        <span class="bn">রেজিস্ট্রেশন সফল হয়েছে! তোমার আইডি সংরক্ষণ করে রাখো।</span>
-        <span class="en">Registration successful! Save your ID below.</span>
+        <span class="bn">রেজিস্ট্রেশন সফল হয়েছে! তোমার রেজিস্ট্রেশন আইডি (reg_code) সংরক্ষণ করে রাখো:</span>
+        <span class="en">Registration successful! Save your registration ID (reg_code) below.</span>
       </div>
       <div class="pid-box">${shownId}</div>`;
     document.getElementById('regForm').reset();
@@ -312,7 +312,7 @@ async function startExam(){
   userAnswers = new Array(currentQuestions.length).fill(null);
   document.getElementById('examLogin').classList.add('hidden');
   document.getElementById('examBody').classList.remove('hidden');
-  document.getElementById('examParticipantName').textContent = record.name + ' (' + (record.pid || record.id) + ') — ' + CATEGORY_LABELS[catKey].bn;
+  document.getElementById('examParticipantName').textContent = record.name + ' (' + (record.pid || record.rowId) + ') — ' + CATEGORY_LABELS[catKey].bn;
   renderQuestions();
   timeLeft = 600;
   examStartTime = Date.now();
@@ -385,7 +385,7 @@ async function submitExam(){
   currentParticipant.timeTakenSec = timeTakenSec;
   currentParticipant.submittedAt = new Date().toISOString();
   try{
-    await window.db.saveExamResult(currentParticipant.pid || currentParticipant.id, {
+    await window.db.saveExamResult(currentParticipant.pid || currentParticipant.rowId, {
       name: currentParticipant.name,
       school: currentParticipant.school || '',
       area: currentParticipant.area || '',

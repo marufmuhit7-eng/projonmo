@@ -18,6 +18,7 @@ function makeFakeSupabase() {
   };
   const handlers = [];           // realtime postgres_changes handlers
   let autoId = 0;
+  let regSeq = 2600000;          // mirrors the Postgres sequence reg_seq
   let clockSeq = 0;              // gives each inserted row a later created_at
 
   function rows(table) { return Array.from(tables[table].entries()); }
@@ -97,6 +98,18 @@ function makeFakeSupabase() {
     from(table) { return builder(table, 'select', null); },
     rpc(name, params) {
       return Promise.resolve().then(function () {
+        if (name === 'create_registration') {
+          const code = 'UHF' + (++regSeq);
+          tables.registrations.set(code, {
+            id: 'row-' + code, pid: code,
+            name: params.p_name, phone: params.p_phone, email: params.p_email,
+            institute: params.p_institute, district: params.p_district, cls: params.p_cls,
+            category: params.p_category, exam_taken: false, score: 0, max_score: 0,
+            time_taken_sec: 0,
+            created_at: new Date(Date.UTC(2026, 0, 1, 0, 0, regSeq - 2600000)).toISOString()
+          });
+          return { data: code, error: null };
+        }
         if (name === 'get_registration') {
           const found = rows('registrations').find(function (e) {
             return e[1].pid === String(params.p_pid || '').toUpperCase();
@@ -248,39 +261,42 @@ function check(label, cond, detail) {
   check('second import inserts nothing (no duplicates)', second.inserted === 0 && second.total === 2);
 
   // ---- registrations + RPC + leaderboard ----------------------------------
-  await db.addRegistration({
-    pid: 'UHF-AB12CD', name: 'রাফি', school: 'স্কুল', cls: 'প্রাইমারি: ৫ম',
+  const savedReg = await db.addRegistration({
+    pid: 'UHF-IGNORED', name: 'রাফি', school: 'স্কুল', cls: 'প্রাইমারি: ৫ম',
     area: 'রংপুর', phone: '01410785155', email: 'r@example.com', category: 'primary'
   });
-  const rec = await db.findRegistration('uhf-ab12cd');   // case-insensitive like the SQL
-  check('addRegistration + findRegistration round-trip', rec && rec.name === 'রাফি');
+  check('addRegistration returns the serial reg_code UHF2600001 (client pid ignored)',
+    savedReg.pid === 'UHF2600001', savedReg);
+  const rec = await db.findRegistration('uhf2600001');   // case-insensitive like the SQL
+  check('findRegistration round-trips by the reg_code', rec && rec.name === 'রাফি');
   check('field mapping: institute -> school, district -> area',
     rec.school === 'স্কুল' && rec.area === 'রংপুর');
   check('new registration has examTaken false', rec.examTaken === false);
   check('unknown pid resolves null (drives "ID not found")',
     (await db.findRegistration('UHF-NOPE')) === null);
 
-  const saved = await db.saveExamResult('UHF-AB12CD', {
+  const saved = await db.saveExamResult('UHF2600001', {
     name: 'রাফি', school: 'স্কুল', area: 'রংপুর',
     examTaken: true, score: 80, maxScore: 100, timeTakenSec: 320,
     category: 'primary', submittedAt: '2026-09-25T10:05:00+06:00'
   });
   check('saveExamResult resolves true', saved === true);
-  const after = await db.findRegistration('UHF-AB12CD');
+  const after = await db.findRegistration('UHF2600001');
   check('registration now marks examTaken + score', after.examTaken === true && after.score === 80);
   const board = await db.listLeaderboard();
   check('leaderboard row written with score but no phone',
     board.length === 1 && board[0].score === 80 && board[0].phone === undefined);
-  const again = await db.saveExamResult('UHF-AB12CD', {
+  const again = await db.saveExamResult('UHF2600001', {
     score: 100, maxScore: 100, timeTakenSec: 1, category: 'primary'
   });
   check('second saveExamResult is refused (already taken)', again === false);
 
   // ---- admin listing -------------------------------------------------------
-  await db.addRegistration({ pid: 'UHF-XY0001', name: 'নাদিয়া', school: 'স্কুল২', cls: 'জুনিয়র: ৭ম', area: 'দিনাজপুর', phone: '01XXXXXXXXX', category: 'junior' });
+  const savedNadia = await db.addRegistration({ pid: 'x', name: 'নাদিয়া', school: 'স্কুল২', cls: 'জুনিয়র: ৭ম', area: 'দিনাজপুর', phone: '01XXXXXXXXX', category: 'junior' });
+  check('second registration gets the next serial UHF2600002', savedNadia.pid === 'UHF2600002', savedNadia);
   const regs = await db.listRegistrations();
-  check('listRegistrations maps rows for the admin table',
-    regs.length === 2 && regs[0].name === 'নাদিয়া');
+  check('listRegistrations maps rows for the admin table (newest first)',
+    regs.length === 2 && regs[0].name === 'নাদিয়া' && regs[1].name === 'রাফি');
 
   check('organiser auth is available', db.auth.available() === true);
   const user = await db.auth.signIn('organiser@example.com', 'pass1234');

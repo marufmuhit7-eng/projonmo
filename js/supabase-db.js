@@ -394,7 +394,8 @@
     if (!r) return null;
     if (!registrationKeys) registrationKeys = Object.keys(r);
     return {
-      pid: r.pid || r.id,
+      pid: r.pid || '',                  // the short reg_code shown everywhere
+      rowId: r.id,                       // internal row key (uuid) — never shown
       name: r.name || '',
       school: r.institute || r.school || '',
       area: r.district || r.area || '',
@@ -415,30 +416,50 @@
     if (!active) {
       return Promise.reject(new Error('রেজিস্ট্রেশন এখন সেভ হতে পারছে না — ডেটাবেস কনফিগার করা নেই। শীঘ্রই আবার চেষ্টা করো।'));
     }
-    var base = {
-      name: rec.name,
-      phone: rec.phone,
-      email: rec.email || '',
-      institute: rec.school || '',
-      district: rec.area || ''
-    };
-    var extras = { pid: rec.pid, cls: rec.cls || '', category: rec.category || null };
-    function insert(row) {
-      return client.from('registrations').insert(row).select()
-        .then(function (res) { if (res.error) throw res.error; return res.data; });
-    }
-    return insert(Object.assign({}, base, extras))
-      .catch(function (err) {
-        if (!missingColumn(err)) throw new Error(err.message || 'insert failed');
-        // draft schema: no pid/cls/category columns — store the base fields
-        // and hand back the generated uuid as the participant ID.
-        return insert(base);
-      })
-      .then(function (data) {
-        var pidOut = rec.pid;
-        if (data && data[0] && (!data[0].pid)) pidOut = data[0].id;   // uuid fallback
-        return { pid: pidOut };
-      });
+    // Preferred path: the create_registration RPC hands out the short
+    // sequential reg_code (UHF2600001, UHF2600002, …) straight from a
+    // Postgres sequence — race-free, and no UUID ever reaches a visitor.
+    return client.rpc('create_registration', {
+      p_name: rec.name,
+      p_phone: rec.phone,
+      p_email: rec.email || '',
+      p_institute: rec.school || '',
+      p_district: rec.area || '',
+      p_cls: rec.cls || '',
+      p_category: rec.category || null
+    }).then(function (res) {
+      if (res.error) throw res.error;
+      if (!res.data) throw new Error('রেজিস্ট্রেশন আইডি পাওয়া যায়নি');
+      return { pid: String(res.data) };
+    }).catch(function (rpcErr) {
+      if (!missingRpc(rpcErr)) throw new Error(rpcErr.message || 'insert failed');
+      console.warn('[supabase-db] create_registration RPC not found — falling back to the insert path. Run supabase/migrate-existing.sql for UHF2600… serial IDs.');
+
+      var base = {
+        name: rec.name,
+        phone: rec.phone,
+        email: rec.email || '',
+        institute: rec.school || '',
+        district: rec.area || ''
+      };
+      var extras = { pid: rec.pid, cls: rec.cls || '', category: rec.category || null };
+      function insert(row) {
+        return client.from('registrations').insert(row).select()
+          .then(function (res) { if (res.error) throw res.error; return res.data; });
+      }
+      return insert(Object.assign({}, base, extras))
+        .catch(function (err) {
+          if (!missingColumn(err)) throw new Error(err.message || 'insert failed');
+          // draft schema: no pid/cls/category columns — store the base fields
+          // and hand back the generated uuid as the participant ID.
+          return insert(base);
+        })
+        .then(function (data) {
+          var pidOut = rec.pid;
+          if (data && data[0] && (!data[0].pid)) pidOut = data[0].id;   // uuid fallback
+          return { pid: pidOut };
+        });
+    });
   }
 
   function findRegistration(pid) {

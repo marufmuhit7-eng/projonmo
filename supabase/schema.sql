@@ -193,6 +193,45 @@ revoke all on function public.save_exam_result(text, int, int, int, text) from p
 grant execute on function public.get_registration(text) to anon, authenticated;
 grant execute on function public.save_exam_result(text, int, int, int, text) to anon, authenticated;
 
+
+-- ---- সিরিয়াল রেজিস্ট্রেশন আইডি: UHF2600001, UHF2600002, … ----------------
+create sequence if not exists public.reg_seq start 2600001 increment 1;
+
+create or replace function public.create_registration(
+  p_name text, p_phone text, p_email text default '',
+  p_institute text default '', p_district text default '',
+  p_cls text default '', p_category text default null
+) returns text
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_code text;
+  v_try  int := 0;
+begin
+  if coalesce(trim(p_name), '') = '' then
+    raise exception 'নাম আবশ্যক / name is required';
+  end if;
+  loop
+    v_code := 'UHF' || nextval('public.reg_seq')::text;
+    begin
+      insert into public.registrations
+        (pid, name, phone, email, institute, district, cls, category)
+      values
+        (v_code, trim(p_name), coalesce(p_phone, ''), coalesce(p_email, ''),
+         coalesce(p_institute, ''), coalesce(p_district, ''),
+         coalesce(p_cls, ''), p_category)
+      returning pid into v_code;
+      return v_code;
+    exception when unique_violation then
+      v_try := v_try + 1;
+      if v_try >= 5 then raise; end if;   -- পুরনো আইডির সাথে সংঘর্ষ: আবার চেষ্টা
+    end;
+  end loop;
+end $$;
+
+revoke all on function public.create_registration(text, text, text, text, text, text, text) from public;
+grant execute on function public.create_registration(text, text, text, text, text, text, text) to anon, authenticated;
+
 -- =====================================================================
 --  7. Realtime — অ্যাডমিন সুইচ ঘোরালে খোলা ব্রাউজারগুলো নিজে আপডেট হয়
 -- =====================================================================
