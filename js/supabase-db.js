@@ -394,7 +394,8 @@
     if (!r) return null;
     if (!registrationKeys) registrationKeys = Object.keys(r);
     return {
-      pid: r.pid || '',                  // the short reg_code shown everywhere
+      pid: r.reg_code || r.pid || '',    // সিরিয়াল কোড UHF000001… (fallback: legacy pid)
+      serialNo: r.serial_no || null,
       rowId: r.id,                       // internal row key (uuid) — never shown
       name: r.name || '',
       school: r.institute || r.school || '',
@@ -469,8 +470,14 @@
         .then(function (res) {
           if (res.error) throw res.error;
           return rowToRegistration(res.data);
+        })
+        .catch(function (err) {
+          if (missingColumn(err)) return null;      // column absent in draft schema
+          throw err;
         });
     }
+    var asTyped = String(pid || '').trim();
+    var asUpper = asTyped.toUpperCase();
     return client.rpc('get_registration', { p_pid: pid })
       .then(function (res) {
         if (res.error) throw res.error;
@@ -481,19 +488,17 @@
           console.error('[supabase-db] registration lookup failed.', rpcErr);
           return null;
         }
-        return byColumn('pid', pid)
-          .catch(function (pidErr) {
-            if (!missingColumn(pidErr)) {
-              console.error('[supabase-db] registration lookup failed.', pidErr);
-              return null;
-            }
-            // last resort: the draft schema's uuid primary key
-            if (!/^[0-9a-fA-F-]{8,}$/.test(String(pid))) return null;
-            return byColumn('id', pid)
-              .catch(function (idErr) {
-                console.error('[supabase-db] registration lookup failed.', idErr);
-                return null;
-              });
+        // Draft schema: no RPC — walk reg_code -> pid -> uuid.
+        return byColumn('reg_code', asUpper)
+          .then(function (hit) { if (hit) return hit; return byColumn('pid', asUpper); })
+          .then(function (hit) {
+            if (hit) return hit;
+            if (!/^[0-9a-fA-F-]{8,}$/.test(asTyped)) return null;
+            return byColumn('id', asTyped);
+          })
+          .catch(function (err) {
+            console.error('[supabase-db] registration lookup failed.', err);
+            return null;
           });
       });
   }
@@ -522,8 +527,9 @@
         if (Object.keys(patch).length === 0) {
           throw new Error('স্কোর সেভ করার কলাম নেই — Supabase SQL Editor-এ supabase/migrate-existing.sql চালাও');
         }
-        var col = keys.indexOf('pid') !== -1 ? 'pid' : 'id';
-        return client.from('registrations').update(patch).eq(col, pid)
+        var keyCol = keys.indexOf('reg_code') !== -1 ? 'reg_code'
+                   : keys.indexOf('pid') !== -1 ? 'pid' : 'id';
+        return client.from('registrations').update(patch).eq(keyCol, pid)
           .then(function (res) {
             if (res.error) throw new Error(res.error.message);
             return true;
@@ -534,11 +540,19 @@
 
   function listRegistrations() {
     if (!active) return Promise.resolve([]);
-    return client.from('registrations').select('*').order('created_at', { ascending: false })
-      .then(function (res) {
-        if (res.error) throw new Error(res.error.message);
-        return (res.data || []).map(rowToRegistration);
-      });
+    // Serial order (UHF000001 first); falls back to created_at desc on the
+    // draft schema where serial_no does not exist yet.
+    function run(col, asc) {
+      return client.from('registrations').select('*').order(col, { ascending: asc })
+        .then(function (res) {
+          if (res.error) throw res.error;
+          return (res.data || []).map(rowToRegistration);
+        });
+    }
+    return run('serial_no', true).catch(function (err) {
+      if (!missingColumn(err)) throw new Error(err.message || 'list failed');
+      return run('created_at', false);
+    });
   }
 
   function listLeaderboard() {

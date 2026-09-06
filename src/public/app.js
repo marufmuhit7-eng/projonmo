@@ -102,8 +102,8 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
     try{ window.localStorage.setItem('uhf:myreg:'+shownId, JSON.stringify({pid:shownId,name})); }catch(e){ /* ignore */ }
     msgBox.innerHTML = `
       <div class="msg ok">
-        <span class="bn">রেজিস্ট্রেশন সফল হয়েছে! তোমার রেজিস্ট্রেশন আইডি (reg_code) সংরক্ষণ করে রাখো:</span>
-        <span class="en">Registration successful! Save your registration ID (reg_code) below.</span>
+        <span class="bn">রেজিস্ট্রেশন সফল হয়েছে!<br>আপনার কোড: <strong>${shownId}</strong><br>এই কোডটি সংরক্ষণ করুন।</span>
+        <span class="en">Registration successful!<br>Your code: <strong>${shownId}</strong><br>Please save this code.</span>
       </div>
       <div class="pid-box">${shownId}</div>`;
     document.getElementById('regForm').reset();

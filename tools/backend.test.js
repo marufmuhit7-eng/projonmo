@@ -18,7 +18,7 @@ function makeFakeSupabase() {
   };
   const handlers = [];           // realtime postgres_changes handlers
   let autoId = 0;
-  let regSeq = 2600000;          // mirrors the Postgres sequence reg_seq
+  let regSeq = 0;                // mirrors the reg_counter table
   let clockSeq = 0;              // gives each inserted row a later created_at
 
   function rows(table) { return Array.from(tables[table].entries()); }
@@ -99,34 +99,38 @@ function makeFakeSupabase() {
     rpc(name, params) {
       return Promise.resolve().then(function () {
         if (name === 'create_registration') {
-          const code = 'UHF' + (++regSeq);
+          regSeq += 1;
+          const code = 'UHF' + String(regSeq).padStart(6, '0');
           tables.registrations.set(code, {
-            id: 'row-' + code, pid: code,
+            id: 'row-' + code, reg_code: code, serial_no: regSeq,
             name: params.p_name, phone: params.p_phone, email: params.p_email,
             institute: params.p_institute, district: params.p_district, cls: params.p_cls,
             category: params.p_category, exam_taken: false, score: 0, max_score: 0,
             time_taken_sec: 0,
-            created_at: new Date(Date.UTC(2026, 0, 1, 0, 0, regSeq - 2600000)).toISOString()
+            created_at: new Date(Date.UTC(2026, 0, 1, 0, 0, regSeq)).toISOString()
           });
           return { data: code, error: null };
         }
         if (name === 'get_registration') {
+          const needle = String(params.p_pid || '').toUpperCase();
           const found = rows('registrations').find(function (e) {
-            return e[1].pid === String(params.p_pid || '').toUpperCase();
+            return e[1].reg_code === needle || e[1].pid === needle;
           });
           return { data: found ? found[1] : null, error: null };
         }
         if (name === 'save_exam_result') {
+          const needle2 = String(params.p_pid || '').toUpperCase();
           const found = rows('registrations').find(function (e) {
-            return e[1].pid === String(params.p_pid || '').toUpperCase() && e[1].exam_taken === false;
+            return (e[1].reg_code === needle2 || e[1].pid === needle2) && e[1].exam_taken === false;
           });
           if (!found) return { data: false, error: null };
           Object.assign(found[1], {
             exam_taken: true, score: params.p_score, max_score: params.p_max,
             time_taken_sec: params.p_time, category: params.p_cat
           });
-          tables.leaderboard.set(found[1].pid, {
-            pid: found[1].pid, name: found[1].name, institute: found[1].institute,
+          const code2 = found[1].reg_code || found[1].pid;
+          tables.leaderboard.set(code2, {
+            pid: code2, name: found[1].name, institute: found[1].institute,
             district: found[1].district, score: params.p_score,
             max_score: params.p_max, time_taken_sec: params.p_time
           });
@@ -265,9 +269,10 @@ function check(label, cond, detail) {
     pid: 'UHF-IGNORED', name: 'রাফি', school: 'স্কুল', cls: 'প্রাইমারি: ৫ম',
     area: 'রংপুর', phone: '01410785155', email: 'r@example.com', category: 'primary'
   });
-  check('addRegistration returns the serial reg_code UHF2600001 (client pid ignored)',
-    savedReg.pid === 'UHF2600001', savedReg);
-  const rec = await db.findRegistration('uhf2600001');   // case-insensitive like the SQL
+  check('addRegistration returns the serial reg_code UHF000001 (client pid ignored)',
+    savedReg.pid === 'UHF000001', savedReg);
+  check('code matches ^UHF\\d{6}$ with no year digits', /^UHF\d{6}$/.test(savedReg.pid) && savedReg.pid.length === 9);
+  const rec = await db.findRegistration('uhf000001');   // case-insensitive like the SQL
   check('findRegistration round-trips by the reg_code', rec && rec.name === 'রাফি');
   check('field mapping: institute -> school, district -> area',
     rec.school === 'স্কুল' && rec.area === 'রংপুর');
@@ -275,28 +280,28 @@ function check(label, cond, detail) {
   check('unknown pid resolves null (drives "ID not found")',
     (await db.findRegistration('UHF-NOPE')) === null);
 
-  const saved = await db.saveExamResult('UHF2600001', {
+  const saved = await db.saveExamResult('UHF000001', {
     name: 'রাফি', school: 'স্কুল', area: 'রংপুর',
     examTaken: true, score: 80, maxScore: 100, timeTakenSec: 320,
     category: 'primary', submittedAt: '2026-09-25T10:05:00+06:00'
   });
   check('saveExamResult resolves true', saved === true);
-  const after = await db.findRegistration('UHF2600001');
+  const after = await db.findRegistration('UHF000001');
   check('registration now marks examTaken + score', after.examTaken === true && after.score === 80);
   const board = await db.listLeaderboard();
   check('leaderboard row written with score but no phone',
     board.length === 1 && board[0].score === 80 && board[0].phone === undefined);
-  const again = await db.saveExamResult('UHF2600001', {
+  const again = await db.saveExamResult('UHF000001', {
     score: 100, maxScore: 100, timeTakenSec: 1, category: 'primary'
   });
   check('second saveExamResult is refused (already taken)', again === false);
 
   // ---- admin listing -------------------------------------------------------
   const savedNadia = await db.addRegistration({ pid: 'x', name: 'নাদিয়া', school: 'স্কুল২', cls: 'জুনিয়র: ৭ম', area: 'দিনাজপুর', phone: '01XXXXXXXXX', category: 'junior' });
-  check('second registration gets the next serial UHF2600002', savedNadia.pid === 'UHF2600002', savedNadia);
+  check('second registration gets the next serial UHF000002', savedNadia.pid === 'UHF000002', savedNadia);
   const regs = await db.listRegistrations();
-  check('listRegistrations maps rows for the admin table (newest first)',
-    regs.length === 2 && regs[0].name === 'নাদিয়া' && regs[1].name === 'রাফি');
+  check('listRegistrations maps rows for the admin table (serial ascending)',
+    regs.length === 2 && regs[0].name === 'রাফি' && regs[0].serialNo === 1 && regs[1].name === 'নাদিয়া' && regs[1].serialNo === 2);
 
   check('organiser auth is available', db.auth.available() === true);
   const user = await db.auth.signIn('organiser@example.com', 'pass1234');

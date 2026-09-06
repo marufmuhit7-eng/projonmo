@@ -65,7 +65,9 @@ create index if not exists questions_category_idx
 -- ------------------------------------------------------------- 3. registrations
 create table if not exists public.registrations (
   id             uuid    primary key default gen_random_uuid(),
-  pid            text    unique not null,          -- অংশগ্রহণকারীর UHF-XXXXXX আইডি
+  reg_code       text    unique,                   -- সিরিয়াল কোড: UHF000001…
+  serial_no      int     unique,                   -- 1, 2, 3…
+  pid            text    unique,                   -- (লেগেসি) পুরনো আইডি
   name           text    not null,
   email          text    default '',
   phone          text    not null default '',
@@ -194,9 +196,61 @@ grant execute on function public.get_registration(text) to anon, authenticated;
 grant execute on function public.save_exam_result(text, int, int, int, text) to anon, authenticated;
 
 
--- ---- সিরিয়াল রেজিস্ট্রেশন আইডি: UHF2600001, UHF2600002, … ----------------
-create sequence if not exists public.reg_seq start 2600001 increment 1;
+-- ---- সিরিয়াল রেজিস্ট্রেশন কোড: UHF000001, UHF000002, … -------------------
+-- ফরম্যাট: ^UHF\d{6}$ — UHF + ঠিক ৬ ডিজিৎ, শূন্য-প্যাডেড, শুরু ১ থেকে।
 
+-- ১) কাউন্টার টেবিল (এক রো, অ্যাটমিক UPDATE..RETURNING দিয়ে বাড়ে)
+create table if not exists public.reg_counter (
+  id          int primary key check (id = 1),
+  next_serial int not null
+);
+
+-- ২) registrations-এ reg_code + serial_no কলাম
+alter table public.registrations
+  add column if not exists reg_code  text,
+  add column if not exists serial_no int;
+
+-- ৩) পুরনো রো ব্যাকফিল: পুরনো তারিখ-ক্রমে serial_no, তারপর reg_code
+with numbered as (
+  select id, row_number() over (order by created_at, id) as rn
+  from public.registrations
+  where serial_no is null
+)
+update public.registrations r
+   set serial_no = n.rn
+  from numbered n
+ where r.id = n.id;
+
+update public.registrations
+   set reg_code = pid
+ where reg_code is null and pid ~ '^UHF\d{6}$';
+
+update public.registrations
+   set reg_code = 'UHF' || lpad(serial_no::text, 6, '0')
+ where reg_code is null and serial_no is not null
+   and not exists (
+     select 1 from public.registrations r2
+      where r2.reg_code = 'UHF' || lpad(public.registrations.serial_no::text, 6, '0')
+   );
+
+-- ৪) কাউন্টার সিড: এখন পর্যন্ত ব্যবহৃত সর্বোচ্চ serial-এর পরের সংখ্যা
+insert into public.reg_counter (id, next_serial)
+values (1, coalesce((select max(serial_no) from public.registrations), 0) + 1)
+on conflict (id) do update
+  set next_serial = greatest(public.reg_counter.next_serial, excluded.next_serial);
+
+-- ৫) UNIQUE সীমা (ব্যাকফিলের পরে, নিরাপদে)
+do $cons$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'registrations_reg_code_key') then
+    alter table public.registrations add constraint registrations_reg_code_key unique (reg_code);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'registrations_serial_no_key') then
+    alter table public.registrations add constraint registrations_serial_no_key unique (serial_no);
+  end if;
+end $cons$;
+
+-- ৬) নতুন রেজিস্ট্রেশন: অ্যাটমিক কাউন্টার -> UHFxxxxxx
 create or replace function public.create_registration(
   p_name text, p_phone text, p_email text default '',
   p_institute text default '', p_district text default '',
@@ -205,26 +259,38 @@ create or replace function public.create_registration(
 language plpgsql security definer set search_path = public
 as $$
 declare
-  v_code text;
-  v_try  int := 0;
+  v_serial int;
+  v_code   text;
+  v_try    int := 0;
 begin
   if coalesce(trim(p_name), '') = '' then
     raise exception 'নাম আবশ্যক / name is required';
   end if;
   loop
-    v_code := 'UHF' || nextval('public.reg_seq')::text;
+    update public.reg_counter set next_serial = next_serial + 1
+     where id = 1
+    returning next_serial - 1 into v_serial;
+
+    if v_serial is null then
+      -- কাউন্টার রো হারিয়ে গিয়ে থাকলে: আবার বীজ বুনে নাও
+      insert into public.reg_counter (id, next_serial)
+      values (1, coalesce((select max(serial_no) from public.registrations), 0) + 2)
+      on conflict (id) do update set next_serial = public.reg_counter.next_serial + 1
+      returning next_serial - 1 into v_serial;
+    end if;
+
+    v_code := 'UHF' || lpad(v_serial::text, 6, '0');
     begin
       insert into public.registrations
-        (pid, name, phone, email, institute, district, cls, category)
+        (reg_code, serial_no, name, phone, email, institute, district, cls, category)
       values
-        (v_code, trim(p_name), coalesce(p_phone, ''), coalesce(p_email, ''),
-         coalesce(p_institute, ''), coalesce(p_district, ''),
-         coalesce(p_cls, ''), p_category)
-      returning pid into v_code;
+        (v_code, v_serial, trim(p_name), coalesce(p_phone, ''), coalesce(p_email, ''),
+         coalesce(p_institute, ''), coalesce(p_district, ''), coalesce(p_cls, ''), p_category)
+      returning reg_code into v_code;
       return v_code;
     exception when unique_violation then
       v_try := v_try + 1;
-      if v_try >= 5 then raise; end if;   -- পুরনো আইডির সাথে সংঘর্ষ: আবার চেষ্টা
+      if v_try >= 5 then raise; end if;   -- বিরল সংঘর্ষে আবার চেষ্টা
     end;
   end loop;
 end $$;
@@ -232,6 +298,49 @@ end $$;
 revoke all on function public.create_registration(text, text, text, text, text, text, text) from public;
 grant execute on function public.create_registration(text, text, text, text, text, text, text) to anon, authenticated;
 
+-- ৭) পুরনো RPC-গুলোও reg_code চেনে (pid/uuid পথ পুরনো রোর জন্য রয়ে গেল)
+create or replace function public.get_registration(p_pid text)
+returns json
+language sql security definer set search_path = public
+as $$
+  select to_json(r) from public.registrations r
+   where r.reg_code = upper(p_pid)
+      or r.pid = upper(p_pid)
+      or r.id::text = p_pid;
+$$;
+
+create or replace function public.save_exam_result(
+  p_pid text, p_score int, p_max int, p_time int, p_cat text
+) returns boolean
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_code text;
+begin
+  update public.registrations
+     set exam_taken = true, score = p_score, max_score = p_max,
+         time_taken_sec = p_time, category = p_cat, submitted_at = now()
+   where (reg_code = upper(p_pid) or pid = upper(p_pid) or id::text = p_pid)
+     and exam_taken = false
+  returning coalesce(reg_code, pid, id::text) into v_code;
+  if v_code is null then return false; end if;
+  insert into public.leaderboard (pid, name, institute, district, score, max_score, time_taken_sec)
+  select v_code, name, institute, district, p_score, p_max, p_time
+    from public.registrations
+   where reg_code = v_code or pid = v_code or id::text = v_code
+  on conflict (pid) do update
+    set score = excluded.score, max_score = excluded.max_score,
+        time_taken_sec = excluded.time_taken_sec;
+  return true;
+end $$;
+
+revoke all on function public.get_registration(text) from public;
+revoke all on function public.save_exam_result(text, int, int, int, text) from public;
+grant execute on function public.get_registration(text) to anon, authenticated;
+grant execute on function public.save_exam_result(text, int, int, int, text) to anon, authenticated;
+
+-- পুরনো বছর-ওয়ালা সিকোয়েন্স আর লাগবে না
+drop sequence if exists public.reg_seq;
 -- =====================================================================
 --  7. Realtime — অ্যাডমিন সুইচ ঘোরালে খোলা ব্রাউজারগুলো নিজে আপডেট হয়
 -- =====================================================================
