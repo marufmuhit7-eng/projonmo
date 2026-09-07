@@ -413,28 +413,61 @@
     };
   }
 
+  /**
+   * Pull the short code out of whatever shape the RPC returns:
+   * 'UHF000001' | [{reg_code:…}] | {reg_code:…}.
+   */
+  function extractRegCode(data) {
+    if (data == null) return null;
+    if (typeof data === 'string') return data;
+    if (Array.isArray(data)) data = data[0];
+    if (data && typeof data === 'object') return data.reg_code || data.code || null;
+    return null;
+  }
+
+  /**
+   * Call create_registration. The canonical RPC takes 7 named params; an
+   * older 5-param deployment (p_name, p_email, p_phone, p_institute,
+   * p_district) is also supported so either database shape works.
+   */
+  function rpcCreateRegistration(rec) {
+    var full = {
+      p_name: rec.name, p_phone: rec.phone, p_email: rec.email || '',
+      p_institute: rec.school || '', p_district: rec.area || '',
+      p_cls: rec.cls || '', p_category: rec.category || null
+    };
+    var minimal = {
+      p_name: rec.name, p_email: rec.email || '', p_phone: rec.phone,
+      p_institute: rec.school || '', p_district: rec.area || ''
+    };
+    function call(args) {
+      return client.rpc('create_registration', args).then(function (res) {
+        if (res.error) throw res.error;
+        var code = extractRegCode(res.data);
+        if (!code) throw new Error('রেজিস্ট্রেশন আইডি পাওয়া যায়নি');
+        return code;
+      });
+    }
+    return call(full).catch(function (errFull) {
+      if (!missingRpc(errFull)) throw errFull;
+      return call(minimal).catch(function (errMin) {
+        if (!missingRpc(errMin)) throw errMin;
+        throw errFull;   // surface the original 7-arg mismatch
+      });
+    });
+  }
+
   function addRegistration(rec) {
     if (!active) {
       return Promise.reject(new Error('রেজিস্ট্রেশন এখন সেভ হতে পারছে না — ডেটাবেস কনফিগার করা নেই। শীঘ্রই আবার চেষ্টা করো।'));
     }
-    // Preferred path: the create_registration RPC hands out the short
-    // sequential reg_code (UHF2600001, UHF2600002, …) straight from a
-    // Postgres sequence — race-free, and no UUID ever reaches a visitor.
-    return client.rpc('create_registration', {
-      p_name: rec.name,
-      p_phone: rec.phone,
-      p_email: rec.email || '',
-      p_institute: rec.school || '',
-      p_district: rec.area || '',
-      p_cls: rec.cls || '',
-      p_category: rec.category || null
-    }).then(function (res) {
-      if (res.error) throw res.error;
-      if (!res.data) throw new Error('রেজিস্ট্রেশন আইডি পাওয়া যায়নি');
-      return { pid: String(res.data) };
-    }).catch(function (rpcErr) {
-      if (!missingRpc(rpcErr)) throw new Error(rpcErr.message || 'insert failed');
-      console.warn('[supabase-db] create_registration RPC not found — falling back to the insert path. Run supabase/migrate-existing.sql for UHF2600… serial IDs.');
+    // Preferred path: the create_registration RPC mints the short serial
+    // reg_code (UHF000001, UHF000002, …) — no UUID ever reaches a visitor.
+    return rpcCreateRegistration(rec)
+      .then(function (code) { return { pid: code }; })
+      .catch(function (rpcErr) {
+        if (!missingRpc(rpcErr)) throw new Error(rpcErr.message || 'insert failed');
+        console.warn('[supabase-db] create_registration RPC not found — falling back to the insert path. Run supabase/fix-reg-and-category.sql for UHF000001… serial codes.');
 
       var base = {
         name: rec.name,

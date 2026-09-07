@@ -7,10 +7,12 @@ Firebase সম্পূর্ণ সরানো হয়েছে।
 ## ⚡ তুমি কি আগে নিজের খসড়া SQL চালিয়েছিলে?
 
 তাহলে তোমার টেবিলে কিছু কলাম/RPC/নিরাপদ-পলিসি কম আছে (settings-এ
-রেজিস্ট্রেশনের তারিখ নেই, registrations-এ pid/স্কোর-কলাম নেই, RPC নেই,
+রেজিস্ট্রেশনের তারিখ নেই, registrations-এ reg_code/স্কোর-কলাম নেই, RPC নেই,
 আর **খোলা পলিসিতে যে কেউ settings লিখতে পারছে!**)। এক রানে ঠিক হয়ে যাবে:
 
-👉 **SQL Editor → `supabase/migrate-existing.sql` পুরোটা পেস্ট → Run**
+👉 **SQL Editor → `supabase/fix-reg-and-category.sql` পুরোটা পেস্ট → Run**
+(রেজিস্ট্রেশন কোড UHF000001…, questions-এ category কলাম, RPC, নিরাপদ RLS,
+Realtime — সব এক ফাইলে; আগের যেকোনো অবস্থা থেকেই নিরাপদ)
 
 (নতুন প্রজেক্টে সরাসরি `supabase/schema.sql` চালালে এটা লাগবে না।)
 

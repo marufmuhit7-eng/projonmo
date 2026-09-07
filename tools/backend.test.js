@@ -438,6 +438,43 @@ function check(label, cond, detail) {
   check('draft: leaderboard read tolerates a reduced shape',
     Array.isArray(await db2.listLeaderboard()));
 
+  // ---------------------------------------------------------------------
+  // Mixed deployment: only a 5-param create_registration exists, returning
+  // the table shape [{id, reg_code, serial_no}].
+  // ---------------------------------------------------------------------
+  console.log('\nsupabase-db — 5-param RPC variant\n');
+
+  function makeFiveArgFake() {
+    return {
+      from() { throw new Error('from() must not be reached on this path'); },
+      rpc(name, params) {
+        return Promise.resolve().then(function () {
+          if (name !== 'create_registration') {
+            return { data: null, error: { code: 'PGRST202', message: 'no matches were found in the schema cache' } };
+          }
+          if ('p_cls' in params || 'p_category' in params) {
+            // the 7-param call does not match this deployment
+            return { data: null, error: { code: 'PGRST202', message: 'no matches were found in the schema cache' } };
+          }
+          return { data: [{ id: 'uuid-1', reg_code: 'UHF000001', serial_no: 1 }], error: null };
+        });
+      }
+    };
+  }
+
+  global.window.SUPABASE_CONFIG = { SUPABASE_URL: 'https://five.supabase.co', SUPABASE_ANON_KEY: 'anon-five' };
+  global.window.supabase = { createClient: function () { return makeFiveArgFake(); } };
+  delete require.cache[require.resolve('../src/shared/supabase-db.js')];
+  require('../src/shared/supabase-db.js');
+  const db4 = global.window.db;
+
+  const r4 = await db4.addRegistration({
+    pid: 'x', name: 'সালমা', phone: '01', email: '', school: 'স্কুল',
+    area: 'রংপুর', cls: 'প্রাইমারি: ৫ম', category: 'primary'
+  });
+  check('5-param variant: array-shaped response still yields the reg_code',
+    r4 && r4.pid === 'UHF000001', r4);
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
 })();
