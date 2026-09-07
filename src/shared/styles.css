@@ -371,6 +371,7 @@
   .contact-list li:last-child{border-bottom:0;padding-bottom:0;}
   .contact-list li:first-child{padding-top:0;}
   .contact-ico{flex:0 0 auto;font-size:1.05rem;line-height:1.5;}
+  .contact-ico img{width:20px;height:20px;object-fit:contain;display:block;}
   .contact-list a{
     color:var(--ink);text-decoration:none;font-weight:600;font-size:0.94rem;
     border-bottom:1px solid transparent;transition:color .15s,border-color .15s;
@@ -394,6 +395,11 @@
   .footer-social a{
     color:rgba(241,233,216,0.78);text-decoration:none;
     display:inline-flex;align-items:center;gap:6px;
+  }
+  .footer-social img.social-ico-img{
+    width:17px;height:17px;object-fit:contain;flex:0 0 auto;
+  }
+  .footer-social a{
     border-bottom:1px solid transparent;padding-bottom:2px;
     transition:color .15s,border-color .15s;
   }
