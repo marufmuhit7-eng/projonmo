@@ -464,7 +464,7 @@
     // Preferred path: the create_registration RPC mints the short serial
     // reg_code (UHF000001, UHF000002, …) — no UUID ever reaches a visitor.
     return rpcCreateRegistration(rec)
-      .then(function (code) { return { pid: code }; })
+      .then(function (code) { return { pid: code, degraded: false }; })
       .catch(function (rpcErr) {
         if (!missingRpc(rpcErr)) throw new Error(rpcErr.message || 'insert failed');
         console.warn('[supabase-db] create_registration RPC not found — falling back to the insert path. Run supabase/fix-reg-and-category.sql for UHF000001… serial codes.');
@@ -491,7 +491,9 @@
         .then(function (data) {
           var pidOut = rec.pid;
           if (data && data[0] && (!data[0].pid)) pidOut = data[0].id;   // uuid fallback
-          return { pid: pidOut };
+          // degraded = the caller must NOT display this id (it is not a
+          // database-minted UHFxxxxxx reg_code). app.js enforces this too.
+          return { pid: pidOut, degraded: !/^UHF\d{4,6}$/.test(pidOut) };
         });
     });
   }

@@ -86,7 +86,7 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
     msgBox.innerHTML = '<div class="msg err"><span class="bn">রেজিস্ট্রেশনের নির্ধারিত সময় শেষ হয়ে গেছে।</span><span class="en">The registration window has closed.</span></div>';
     return;
   }
-  const id = genId();
+  const id = genId();   // internal reference only — never shown to the visitor
   btn.disabled = true;
   btn.innerHTML = '<span class="bn">জমা হচ্ছে…</span><span class="en">Submitting…</span>';
   try{
@@ -94,20 +94,31 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
       pid:id, name, school, cls, area, phone, email,
       category: getCategoryKey(cls)
     });
-    // The database decides the real ID: the short UHF-xxx when the pid column
-    // exists, otherwise the generated uuid (draft schema) — always echo what
-    // was actually stored, so exam sign-in works either way.
-    const shownId = (saved && saved.pid) || id;
-    // Cache our own ID locally (a convenience copy, never the source of truth).
-    try{ window.localStorage.setItem('uhf:myreg:'+shownId, JSON.stringify({pid:shownId,name})); }catch(e){ /* ignore */ }
+    /*
+     * 🔒 HARD RULE — the only thing a visitor may ever see as their code is
+     * a database-minted reg_code matching ^UHF\d{4,6}$ (UHF000001…).
+     * A uuid, a random token or anything else is REFUSED here, whatever the
+     * backend returned. No data.id, no result.id, no crypto.randomUUID().
+     */
+    const code = (saved && saved.pid) || '';
+    if(!/^UHF\d{4,6}$/.test(code)){
+      console.error('[registration] refusing to display a non-reg_code id:', code || '(nothing returned)');
+      msgBox.innerHTML = '<div class="msg err">' +
+        '<span class="bn">রেজিস্ট্রেশন সেভ হয়েছে ✅ কিন্তু ছোট কোডটি এখনই দেখানো যাচ্ছে না (ডেটাবেস আপডেট বাকি)। অনুগ্রহ করে <strong>০১৪১০৭৮৫১৫৫</strong> নম্বরে নিজের নাম ও মোবাইল নম্বর জানিয়ে কোডটি সংগ্রহ করো।</span>' +
+        '<span class="en">Your registration was saved ✅ but the short code cannot be shown yet (database update pending). Please contact the organisers to receive your code.</span>' +
+        '</div>';
+      return;   // finally{} below restores the button
+    }
+    // Cache our own code locally (a convenience copy, never the source of truth).
+    try{ window.localStorage.setItem('uhf:myreg:'+code, JSON.stringify({pid:code,name})); }catch(e){ /* ignore */ }
     msgBox.innerHTML = `
       <div class="msg ok">
-        <span class="bn">রেজিস্ট্রেশন সফল হয়েছে!<br>আপনার কোড: <strong>${shownId}</strong><br>এই কোডটি সংরক্ষণ করুন।</span>
-        <span class="en">Registration successful!<br>Your code: <strong>${shownId}</strong><br>Please save this code.</span>
+        <span class="bn">রেজিস্ট্রেশন সফল হয়েছে!<br>আপনার কোড: <strong>${code}</strong><br>এই কোডটি সংরক্ষণ করুন।</span>
+        <span class="en">Registration successful!<br>Your code: <strong>${code}</strong><br>Please save this code.</span>
       </div>
-      <div class="pid-box">${shownId}</div>`;
+      <div class="pid-box">${code}</div>`;
     document.getElementById('regForm').reset();
-    document.getElementById('examIdInput').value = shownId;
+    document.getElementById('examIdInput').value = code;
   }catch(err){
     console.error('[registration] failed:', (err && err.code) || '', err);
     const t = registrationErrorTexts(err);

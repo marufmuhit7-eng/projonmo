@@ -271,6 +271,7 @@ function check(label, cond, detail) {
   });
   check('addRegistration returns the serial reg_code UHF000001 (client pid ignored)',
     savedReg.pid === 'UHF000001', savedReg);
+  check('RPC path is not flagged degraded', savedReg.degraded === false, savedReg);
   check('code matches ^UHF\\d{6}$ with no year digits', /^UHF\d{6}$/.test(savedReg.pid) && savedReg.pid.length === 9);
   const rec = await db.findRegistration('uhf000001');   // case-insensitive like the SQL
   check('findRegistration round-trips by the reg_code', rec && rec.name === 'রাফি');
@@ -419,6 +420,8 @@ function check(label, cond, detail) {
   });
   check('draft: insert falls back and returns the uuid id as pid',
     saved2 && saved2.pid && saved2.pid.indexOf('UHF-') === -1, saved2);
+  check('draft: uuid fallback is flagged degraded — the UI must refuse to show it',
+    saved2.degraded === true, saved2);
   const got2 = await db2.findRegistration(saved2.pid);
   check('draft: findRegistration by uuid works (rpc/pid columns missing)', got2 && got2.name === 'করিম');
 
