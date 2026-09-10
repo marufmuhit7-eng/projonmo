@@ -866,10 +866,10 @@ async function loadAdminRegistrations(){
   const note = document.getElementById('regsSourceNote');
   if(note){
     if(window.db.active){
-      note.innerHTML = '<span class="bn">✅ Supabase — যেকোনো ডিভাইস থেকে করা রেজিস্ট্রেশন এখানে আসছে।</span><span class="en">✅ Supabase — registrations from every device land here.</span>';
+      note.innerHTML = '<span class="bn">✅ Supabase — যেকোনো ডিভাইস থেকে করা রেজিস্ট্রেশন এখানে আসছে। তালিকা খালি মনে হলে আগে ☁️ সাইন-ইন করো।</span><span class="en">✅ Supabase — registrations from every device land here.</span>';
       note.style.color = 'var(--sage)';
     }else{
-      note.innerHTML = '<span class="bn">⚠️ Supabase কনফিগার করা নেই — রেজিস্ট্রেশন কোথাও সেভ হচ্ছে না। <code>src/shared/supabase-config.js</code> পূরণ করো।</span><span class="en">⚠️ Supabase is not configured — registrations are not being saved anywhere. Fill in <code>src/shared/supabase-config.js</code>.</span>';
+      note.innerHTML = '<span class="bn">⚠️ Supabase কনফিগার করা নেই — রেজিস্ট্রেশন কোথাও সেভ হচ্ছে না। <code>src/shared/supabase-config.js</code> পূরণ করো।</span><span class="en">⚠️ Supabase is not configured — registrations are not being saved anywhere.</span>';
       note.style.color = 'var(--clay-dark)';
     }
   }
@@ -878,10 +878,27 @@ async function loadAdminRegistrations(){
     adminRegsCache = await window.db.listRegistrations();
     renderAdminRegsTable();
   }catch(err){
-    console.error(err);
-    body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;">তালিকা লোড করা যায়নি — ' + escapeHtml(err.message) + '</td></tr>';
+    console.error('Error fetching registrations:', err);
+    const denied = /row-level security|permission|jwt|401|403/i.test(String(err.message||''));
+    body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;">' +
+      (denied
+        ? '<span class="bn">🔒 তালিকা পড়ার অনুমতি নেই — উপরের <strong>☁️ আয়োয়ক সাইন-ইন</strong> বক্সে সাইন-ইন করো (রেজিস্ট্রেশনের ফোন/ইমেইল শুধু আয়োয়কই দেখতে পারে)।</span><span class="en">🔒 Read denied — sign in via the ☁️ box above.</span>'
+        : '<span class="bn">তালিকা লোড করা যায়নি: ' + escapeHtml(err.message) + '</span>') +
+      '</td></tr>';
+    return;
+  }
+  // An empty list is trustworthy only when the organiser is signed in —
+  // otherwise RLS hides every row and it looks like "no data".
+  if(adminRegsCache.length === 0 && window.db.active){
+    try{
+      const who = await window.db.auth.currentUser();
+      if(!who){
+        body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;"><span class="bn">☁️ আয়োয়ক <strong>সাইন-ইন করা নেই</strong> — রেজিস্ট্রেশন তালিকা শুধু সাইন-ইন করা আয়োয়ক দেখতে পারে। উপরের ☁️ বক্সে সাইন-ইন করো (অ্যাকাউন্ট বানাও: Supabase → Authentication → Users → Add user)।</span><span class="en">☁️ Not signed in — the list is visible to signed-in organisers only.</span></td></tr>';
+      }
+    }catch(e){ /* ignore */ }
   }
 }
+
 
 /** Render with the live search filter (name / phone / email). */
 function renderAdminRegsTable(){
@@ -901,14 +918,17 @@ function renderAdminRegsTable(){
   records.forEach(function(rec){
     const tr = document.createElement('tr');
     const catKey = rec.category || getCategoryKey(rec.cls);
-    const catLabel = catKey && CATEGORY_LABELS[catKey] ? CATEGORY_LABELS[catKey].bn : (rec.cls || '');
     const whenRaw = rec.createdAt;
     const when = typeof whenRaw === 'string' ? whenRaw.slice(0,10)
       : (whenRaw && whenRaw.toDate ? whenRaw.toDate().toLocaleDateString('en-GB') : '');
     tr.innerHTML = '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + (rec.pid ? escapeHtml(rec.pid) : '—') + '</td>' +
-      '<td>' + escapeHtml(rec.name) + '</td><td>' + escapeHtml(rec.school) + '</td><td>' + escapeHtml(catLabel) + '</td>' +
-      '<td>' + escapeHtml(rec.area) + '</td><td>' + escapeHtml(rec.phone) + '</td><td>' + escapeHtml(rec.email) + '</td>' +
-      '<td>' + (rec.examTaken ? '✅ ' + escapeHtml(when) : '—') + '</td>' +
+      '<td>' + escapeHtml(rec.name) + '</td>' +
+      '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + escapeHtml(rec.phone) + '</td>' +
+      '<td>' + escapeHtml(rec.email) + '</td>' +
+      '<td>' + escapeHtml(rec.school) + '</td>' +
+      '<td>' + escapeHtml(rec.area) + '</td>' +
+      '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + escapeHtml(when) + '</td>' +
+      '<td>' + (rec.examTaken ? '✅' : '—') + '</td>' +
       '<td>' + (rec.examTaken ? rec.score + (rec.maxScore ? '/' + rec.maxScore : '') : '—') + '</td>';
     body.appendChild(tr);
   });
