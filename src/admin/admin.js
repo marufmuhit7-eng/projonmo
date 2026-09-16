@@ -873,14 +873,14 @@ async function loadAdminRegistrations(){
       note.style.color = 'var(--clay-dark)';
     }
   }
-  body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;">… লোড হচ্ছে</td></tr>';
+  body.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;">… লোড হচ্ছে</td></tr>';
   try{
     adminRegsCache = await window.db.listRegistrations();
     renderAdminRegsTable();
   }catch(err){
     console.error('Error fetching registrations:', err);
     const denied = /row-level security|permission|jwt|401|403/i.test(String(err.message||''));
-    body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;">' +
+    body.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;">' +
       (denied
         ? '<span class="bn">🔒 তালিকা পড়ার অনুমতি নেই — উপরের <strong>☁️ আয়োয়ক সাইন-ইন</strong> বক্সে সাইন-ইন করো (রেজিস্ট্রেশনের ফোন/ইমেইল শুধু আয়োয়কই দেখতে পারে)।</span><span class="en">🔒 Read denied — sign in via the ☁️ box above.</span>'
         : '<span class="bn">তালিকা লোড করা যায়নি: ' + escapeHtml(err.message) + '</span>') +
@@ -893,7 +893,7 @@ async function loadAdminRegistrations(){
     try{
       const who = await window.db.auth.currentUser();
       if(!who){
-        body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;"><span class="bn">☁️ আয়োয়ক <strong>সাইন-ইন করা নেই</strong> — রেজিস্ট্রেশন তালিকা শুধু সাইন-ইন করা আয়োয়ক দেখতে পারে। উপরের ☁️ বক্সে সাইন-ইন করো (অ্যাকাউন্ট বানাও: Supabase → Authentication → Users → Add user)।</span><span class="en">☁️ Not signed in — the list is visible to signed-in organisers only.</span></td></tr>';
+        body.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;"><span class="bn">☁️ আয়োয়ক <strong>সাইন-ইন করা নেই</strong> — রেজিস্ট্রেশন তালিকা শুধু সাইন-ইন করা আয়োয়ক দেখতে পারে। উপরের ☁️ বক্সে সাইন-ইন করো (অ্যাকাউন্ট বানাও: Supabase → Authentication → Users → Add user)।</span><span class="en">☁️ Not signed in — the list is visible to signed-in organisers only.</span></td></tr>';
       }
     }catch(e){ /* ignore */ }
   }
@@ -906,27 +906,31 @@ function renderAdminRegsTable(){
   const term = (document.getElementById('regsSearchInput').value || '').trim().toLowerCase();
   const records = adminRegsCache.filter(function(rec){
     if(!term) return true;
-    return [rec.name, rec.phone, rec.email, rec.pid, rec.school]
+    return [rec.name, rec.phone, rec.email, rec.pid, rec.school, rec.category]
       .some(function(v){ return v && String(v).toLowerCase().indexOf(term) !== -1; });
   });
   if(records.length === 0){
-    body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;">' +
+    body.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;">' +
       (adminRegsCache.length === 0 ? 'এখনো কোনো রেজিস্ট্রেশন হয়নি।' : 'কিছু পাওয়া যায়নি।') + '</td></tr>';
     return;
   }
   body.innerHTML = '';
   records.forEach(function(rec){
     const tr = document.createElement('tr');
-    const catKey = rec.category || getCategoryKey(rec.cls);
     const whenRaw = rec.createdAt;
     const when = typeof whenRaw === 'string' ? whenRaw.slice(0,10)
       : (whenRaw && whenRaw.toDate ? whenRaw.toDate().toLocaleDateString('en-GB') : '');
+    const catKey = rec.category || getCategoryKey(rec.cls);
+    const catLabel = catKey
+      ? (CATEGORY_LABELS[catKey] ? CATEGORY_LABELS[catKey].bn : catKey)
+      : (rec.cls || '—');
     tr.innerHTML = '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + (rec.pid ? escapeHtml(rec.pid) : '—') + '</td>' +
       '<td>' + escapeHtml(rec.name) + '</td>' +
       '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + escapeHtml(rec.phone) + '</td>' +
       '<td>' + escapeHtml(rec.email) + '</td>' +
       '<td>' + escapeHtml(rec.school) + '</td>' +
       '<td>' + escapeHtml(rec.area) + '</td>' +
+      '<td>' + escapeHtml(catLabel) + '</td>' +
       '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + escapeHtml(when) + '</td>' +
       '<td>' + (rec.examTaken ? '✅' : '—') + '</td>' +
       '<td>' + (rec.examTaken ? rec.score + (rec.maxScore ? '/' + rec.maxScore : '') : '—') + '</td>';

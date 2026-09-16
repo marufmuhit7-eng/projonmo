@@ -42,5 +42,19 @@ create policy "organisers update registrations" on public.registrations
 --    for select using (true);
 -- =====================================================================
 
--- 🧹 টেস্ট-রো পরিষ্কার: আমার লাইভ-প্রোবে তৈরি হওয়া রোগুলো মুছে দাও —
-delete from public.registrations where name in ('probeA','probeB','probe');
+-- ৪) ক্যাটাগরি: কলামটা নিশ্চিত + পুরনো (RPC-পূর্ব) রোগুলোতে ডিফল্ট বসাও
+--    (নতুন রেজিস্ট্রেশনগুলো RPC থেকে আগে থেকেই ক্যাটাগরি পায়)
+alter table public.registrations
+  add column if not exists category text default 'সাধারণ';
+
+update public.registrations
+   set category = 'সাধারণ'
+ where category is null;
+
+-- ⚠️ create_registration RPC বদলানোর দরকার নেই — চলছে এমন ভার্সনই
+-- p_category নেয় ও সেভ করে (লাইভে যাচাইকৃত)। খসড়া ৬-প্যারাম সংস্করণে
+-- বসালে p_cls (শ্রেণি) হারিয়ে যেত; তবু চাইলে JS দুই আকৃতিই সামলাবে।
+
+-- 🧹 টেস্ট-রো পরিষ্কার: লাইভ-প্রোবে তৈরি হওয়া রোগুলো মুছে দাও —
+delete from public.registrations
+ where name in ('probeA','probeB','probe','cat-প্রোব (মুছে দাও)');

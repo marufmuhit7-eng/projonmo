@@ -440,6 +440,12 @@
       p_name: rec.name, p_email: rec.email || '', p_phone: rec.phone,
       p_institute: rec.school || '', p_district: rec.area || ''
     };
+    // their 6-param draft (no p_cls) — still receives the real category
+    var middle = {
+      p_name: rec.name, p_email: rec.email || '', p_phone: rec.phone,
+      p_institute: rec.school || '', p_district: rec.area || '',
+      p_category: rec.category || 'সাধারণ'
+    };
     function call(args) {
       return client.rpc('create_registration', args).then(function (res) {
         if (res.error) throw res.error;
@@ -450,9 +456,12 @@
     }
     return call(full).catch(function (errFull) {
       if (!missingRpc(errFull)) throw errFull;
-      return call(minimal).catch(function (errMin) {
-        if (!missingRpc(errMin)) throw errMin;
-        throw errFull;   // surface the original 7-arg mismatch
+      return call(middle).catch(function (errMid) {
+        if (!missingRpc(errMid)) throw errMid;
+        return call(minimal).catch(function (errMin) {
+          if (!missingRpc(errMin)) throw errMin;
+          throw errFull;   // surface the original 7-arg mismatch
+        });
       });
     });
   }

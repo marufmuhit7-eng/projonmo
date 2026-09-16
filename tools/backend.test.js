@@ -478,6 +478,45 @@ function check(label, cond, detail) {
   check('5-param variant: array-shaped response still yields the reg_code',
     r4 && r4.pid === 'UHF000001', r4);
 
+  // ---------------------------------------------------------------------
+  // Mixed deployment 2: only a 6-param create_registration exists (the
+  // organiser's draft shape — no p_cls, p_category defaults 'সাধারণ').
+  // ---------------------------------------------------------------------
+  console.log('\nsupabase-db — 6-param RPC variant\n');
+
+  function makeSixArgFake() {
+    return {
+      from() { throw new Error('from() must not be reached on this path'); },
+      rpc(name, params) {
+        return Promise.resolve().then(function () {
+          if (name !== 'create_registration') {
+            return { data: null, error: { code: 'PGRST202', message: 'no matches were found in the schema cache' } };
+          }
+          if ('p_cls' in params) {
+            return { data: null, error: { code: 'PGRST202', message: 'no matches were found in the schema cache' } };
+          }
+          if (!('p_category' in params) || params.p_category !== 'junior') {
+            return { data: null, error: { code: 'PGRST202', message: 'no matches were found in the schema cache' } };
+          }
+          return { data: 'UHF000003', error: null };
+        });
+      }
+    };
+  }
+
+  global.window.SUPABASE_CONFIG = { SUPABASE_URL: 'https://six.supabase.co', SUPABASE_ANON_KEY: 'anon-six' };
+  global.window.supabase = { createClient: function () { return makeSixArgFake(); } };
+  delete require.cache[require.resolve('../src/shared/supabase-db.js')];
+  require('../src/shared/supabase-db.js');
+  const db5 = global.window.db;
+
+  const r5 = await db5.addRegistration({
+    pid: 'x', name: 'জাহিদ', phone: '02', email: '', school: 'স্কুল',
+    area: 'দিনাজপুর', cls: 'জুনিয়র: ৭ম', category: 'junior'
+  });
+  check('6-param variant: the real category still reaches the RPC',
+    r5 && r5.pid === 'UHF000003', r5);
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
 })();
