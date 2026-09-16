@@ -599,6 +599,67 @@
     });
   }
 
+  // ------------------------------------------------------------------ team
+  function rowToTeamMember(r) {
+    return {
+      id: r.id,
+      name: r.name || '',
+      role: r.role || '',
+      category: r.category || 'core',
+      imageUrl: r.image_url || '',
+      districtInstitute: r.district_institute || '',
+      facebookUrl: r.facebook_url || '',
+      order: typeof r.order_no === 'number' ? r.order_no : 0
+    };
+  }
+
+  /** Public team section; an absent table resolves to [] (shipped markup stays). */
+  function listTeamMembers() {
+    if (!active) return Promise.resolve([]);
+    return client.from('team_members').select('*').order('order_no', { ascending: true })
+      .then(function (res) {
+        if (res.error) {
+          // PGRST205 = table not created yet — not an error worth alarming anyone
+          if (String(res.error.code) !== 'PGRST205') {
+            console.error('[supabase-db] team_members read failed.', res.error);
+          }
+          return [];
+        }
+        return (res.data || []).map(rowToTeamMember);
+      });
+  }
+
+  function teamRow(m) {
+    return {
+      name: m.name || '',
+      role: m.role || '',
+      category: m.category || 'core',
+      image_url: m.imageUrl || '',
+      district_institute: m.districtInstitute || '',
+      facebook_url: m.facebookUrl || '',
+      order_no: typeof m.order === 'number' ? m.order : 0
+    };
+  }
+
+  /** Admin: add or update one member. */
+  function saveTeamMember(m, id) {
+    if (!active) return Promise.reject(new Error('Supabase কনফিগার করা নেই'));
+    if (!m.name) return Promise.reject(new Error('নাম আবশ্যক'));
+    var req = id
+      ? client.from('team_members').update(teamRow(m)).eq('id', id)
+      : client.from('team_members').insert(teamRow(m));
+    return req.then(function (res) {
+      if (res.error) throw res.error;
+    });
+  }
+
+  function deleteTeamMember(id) {
+    if (!active) return Promise.reject(new Error('Supabase কনফিগার করা নেই'));
+    return client.from('team_members').delete().eq('id', id).then(function (res) {
+      if (res.error) throw res.error;
+    });
+  }
+
   function listLeaderboard() {
     if (!active) return Promise.resolve([]);
     var COLS = 'pid,name,institute,district,score,max_score,time_taken_sec';
@@ -679,6 +740,9 @@
     saveExamResult: saveExamResult,
     listRegistrations: listRegistrations,
     listLeaderboard: listLeaderboard,
+    listTeamMembers: listTeamMembers,
+    saveTeamMember: saveTeamMember,
+    deleteTeamMember: deleteTeamMember,
     auth: authApi,
     get windowSupported() { return !!(settingsKeys && settingsKeys.indexOf('registration_start') !== -1); },
     _internal: { normControl: normControl, rowToControl: rowToControl, rowToQuestion: rowToQuestion, letterToIndex: letterToIndex }

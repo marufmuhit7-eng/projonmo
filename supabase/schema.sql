@@ -196,6 +196,44 @@ grant execute on function public.get_registration(text) to anon, authenticated;
 grant execute on function public.save_exam_result(text, int, int, int, text) to anon, authenticated;
 
 
+
+-- ------------------------------------------------- ৫) টিম ম্যানেজমেন্ট
+create table if not exists public.team_members (
+  id                 uuid    primary key default gen_random_uuid(),
+  name               text    not null,
+  role               text    not null default '',
+  category           text    not null default 'core',   -- title_sponsor / co_organizer / organizer / volunteer / sponsor
+  image_url          text    default '',
+  district_institute text    default '',
+  facebook_url       text    default '',
+  order_no           int     not null default 0,
+  created_at         timestamptz not null default now()
+);
+
+alter table public.team_members enable row level security;
+drop policy if exists "Public read team_members" on public.team_members;
+create policy "Public read team_members" on public.team_members
+  for select to anon, authenticated using (true);
+-- ⚠️ খসড়ার "Public write ... using (true)" বসানো হয়নি — তাহলে anon key জানা
+-- মাত্র যে কেউ টিম পাতা মুছে/বদলে দিতে পারত। লেখা শুধু সাইন-ইন করা আয়োয়ক:
+drop policy if exists "Public write team_members" on public.team_members;
+drop policy if exists "organisers manage team_members" on public.team_members;
+create policy "organisers manage team_members" on public.team_members
+  for all to authenticated using (true) with check (true);
+
+-- একবারই বীজ: এখনকার হার্ডকোডেড টিমটাই ডেটাবেসে তোলো (টেবিল খালি থাকলে)
+insert into public.team_members (name, role, category, image_url, district_institute, facebook_url, order_no)
+select * from (values
+  ('প্রজন্ম ফাউন্ডেশন', 'টাইটেল স্পন্সর', 'title_sponsor', '/images/projonmo-logo.jpg', '', '', 1),
+  ('The Normative', 'সহ-আয়োজক', 'co_organizer', '/images/normative-logo.jpg', '', '', 1),
+  ('মুদাব্বির মারুফ মুহিত', 'আহ্বায়ক', 'organizer', '/images/muhit.jpg', '', '', 1),
+  ('শেখ ইমরোজ ওয়াতান', 'যুগ্ম আহ্বায়ক', 'organizer', '/images/watan.jpg', '', '', 2),
+  ('রংপুর সিটি কর্পোরেশন', 'পৃষ্ঠপোষক', 'sponsor', '/images/rcc.jpg', '', '', 1),
+  ('মাদকদ্রব্য নিয়ন্ত্রণ অধিদপ্তর', 'পৃষ্ঠপোষক', 'sponsor', '/images/dnc.jpg', '', '', 2),
+  ('রয়্যালটি মেগা মল', 'পৃষ্ঠপোষক', 'sponsor', '/images/royalty.jpg', '', '', 3)
+) as seed(name, role, category, image_url, district_institute, facebook_url, order_no)
+where not exists (select 1 from public.team_members);
+
 -- ---- সিরিয়াল রেজিস্ট্রেশন কোড: UHF000001, UHF000002, … -------------------
 -- ফরম্যাট: ^UHF\d{6}$ — UHF + ঠিক ৬ ডিজিৎ, শূন্য-প্যাডেড, শুরু ১ থেকে।
 

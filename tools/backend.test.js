@@ -14,7 +14,8 @@ function makeFakeSupabase() {
     settings:       new Map(),   // id -> row
     questions:      new Map(),   // uuid -> row
     registrations:  new Map(),   // uuid -> row (pid is unique in the data)
-    leaderboard:    new Map()    // pid -> row
+    leaderboard:    new Map(),   // pid -> row
+    team_members:   new Map()    // uuid -> row
   };
   const handlers = [];           // realtime postgres_changes handlers
   let autoId = 0;
@@ -310,6 +311,29 @@ function check(label, cond, detail) {
   check('currentUser sees the session', (await db.auth.currentUser()) !== null);
   await db.auth.signOut();
   check('signOut clears the session', (await db.auth.currentUser()) === null);
+
+  // ---- team management ------------------------------------------------------
+  await db.saveTeamMember({ name: 'মুদাব্বির মারুফ মুহিত', role: 'আহ্বায়ক', category: 'organizer',
+    imageUrl: '/images/muhit.jpg', districtInstitute: 'রংপুর', facebookUrl: '', order: 1 });
+  await db.saveTeamMember({ name: 'রংপুর সিটি কর্পোরেশন', role: 'পৃষ্ঠপোষক', category: 'sponsor',
+    imageUrl: '/images/rcc.jpg', order: 1 });
+  const team = await db.listTeamMembers();
+  check('team: two members listed', team.length === 2, team.length);
+  check('team: row mapping snake_case -> camelCase',
+    team[0].imageUrl === '/images/muhit.jpg' && team[0].districtInstitute === 'রংপুর', team[0]);
+  const firstId = team[0].id;
+  await db.saveTeamMember({ name: 'মুহিত (সম্পাদিত)', role: 'আহ্বায়ক', category: 'organizer',
+    imageUrl: '/images/muhit.jpg', order: 5 }, firstId);
+  const team2 = await db.listTeamMembers();
+  check('team: edit keeps one copy and updates the name',
+    team2.length === 2 && team2.some(function(m){ return m.name === 'মুহিত (সম্পাদিত)'; }));
+  let nameRejected = false;
+  try { await db.saveTeamMember({ name: '', role: 'x', category: 'sponsor' }); }
+  catch (e) { nameRejected = true; }
+  check('team: empty name is rejected', nameRejected);
+  await db.deleteTeamMember(firstId);
+  const team3 = await db.listTeamMembers();
+  check('team: delete removes the row', team3.length === 1 && team3[0].category === 'sponsor');
 
   stop();
 

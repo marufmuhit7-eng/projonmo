@@ -461,3 +461,93 @@ function renderLeaderboardTable(cat){
     body.appendChild(tr);
   });
 }
+
+
+/* ---------- Team (dynamic from Supabase, falls back to the shipped markup) ---------- */
+
+/*
+ * If the team_members table has rows, the hardcoded team section is rebuilt
+ * from the database (same design, same classes). Zero rows, a missing table
+ * or a fetch error keeps the shipped markup — the section never goes blank.
+ */
+async function loadTeamSection(){
+  const section = document.getElementById('team');
+  if(!section || !window.db || !window.db.active) return;
+  let members = [];
+  try{
+    members = await window.db.listTeamMembers();
+  }catch(err){
+    console.error('[team] load failed — keeping the shipped markup', err);
+    return;
+  }
+  if(!Array.isArray(members) || members.length === 0) return;
+
+  const ORDER = ['title_sponsor', 'co_organizer', 'organizer', 'volunteer', 'sponsor'];
+  const groups = {};
+  members.forEach(function(m){
+    const cat = m.category || 'core';
+    (groups[cat] = groups[cat] || []).push(m);
+  });
+
+  function imgTag(m, size){
+    if(!m.imageUrl) return '';
+    return '<img src="' + escapeHtml(m.imageUrl) + '" alt="' + escapeHtml(m.name) +
+      '" width="' + size + '" height="' + size + '" loading="lazy" decoding="async">';
+  }
+  function fbLink(m){
+    if(!m.facebookUrl) return '';
+    return '<a href="' + escapeHtml(m.facebookUrl) + '" target="_blank" rel="noopener noreferrer" ' +
+      'style="display:inline-flex;align-items:center;gap:5px;margin-top:6px;font-size:0.8rem;color:var(--maroon);">' +
+      '<img src="./images/facebook-logo.png" alt="" width="14" height="14" style="object-fit:contain;">' +
+      '<span>ফেসবুক</span></a>';
+  }
+
+  let html = '';
+  Object.keys(groups)
+    .sort(function(a, b){ return ORDER.indexOf(a) - ORDER.indexOf(b); })
+    .forEach(function(cat){
+      const label = teamCategoryLabel(cat);
+      const block = label.block;
+      let inner = '';
+      if(block === 'tier-title'){
+        groups[cat].forEach(function(m){
+          inner += '<div class="tier-title">' + imgTag(m, 150) +
+            '<p class="credit-name">' + escapeHtml(m.name) + '</p>' +
+            (m.role ? '<span class="credit-tag">' + escapeHtml(m.role) + '</span>' : '') + '</div>';
+        });
+      }else if(block === 'tier-co'){
+        groups[cat].forEach(function(m){
+          inner += '<div class="tier-co">' + imgTag(m, 104) +
+            '<p class="credit-name">' + escapeHtml(m.name) + '</p>' +
+            (m.role ? '<span class="credit-tag">' + escapeHtml(m.role) + '</span>' : '') + '</div>';
+        });
+      }else if(block === 'sponsor'){
+        inner += '<div class="sponsor-grid">';
+        groups[cat].forEach(function(m){
+          inner += '<div class="sponsor">' + imgTag(m, 96) +
+            '<span>' + escapeHtml(m.name) + '</span></div>';
+        });
+        inner += '</div>';
+      }else{   // people: organizer / volunteer / custom categories
+        inner += '<div class="people-grid">';
+        groups[cat].forEach(function(m){
+          inner += '<div class="person">' + imgTag(m, 120) +
+            '<p class="credit-name">' + escapeHtml(m.name) + '</p>' +
+            (m.role ? '<span class="credit-tag">' + escapeHtml(m.role) + '</span>' : '') +
+            (m.districtInstitute ? '<p class="small-note" style="margin:6px 0 0;">' + escapeHtml(m.districtInstitute) + '</p>' : '') +
+            fbLink(m) + '</div>';
+        });
+        inner += '</div>';
+      }
+      html += '<div class="credit-block"><div class="credit-head"><h3><span class="bn">' +
+        escapeHtml(label.bn) + '</span><span class="en">' + escapeHtml(label.en) + '</span></h3></div>' +
+        inner + '</div>';
+    });
+
+  const wrap = section.querySelector('.wrap');
+  const eyebrow = wrap.querySelector('.eyebrow');
+  const h2 = wrap.querySelector('h2');
+  const head = (eyebrow ? eyebrow.outerHTML : '') + (h2 ? h2.outerHTML : '');
+  wrap.innerHTML = head + html;
+}
+loadTeamSection();

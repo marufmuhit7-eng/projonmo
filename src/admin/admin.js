@@ -149,10 +149,12 @@ function switchAdminSub(sub){
   document.getElementById('adminQuestions').classList.toggle('hidden', sub!=='questions');
   document.getElementById('adminTimer').classList.toggle('hidden', sub!=='timer');
   document.getElementById('adminRegs').classList.toggle('hidden', sub!=='regs');
+  document.getElementById('adminTeam').classList.toggle('hidden', sub!=='team');
   document.getElementById('adminPassword').classList.toggle('hidden', sub!=='password');
   if(sub==='timer') loadExamControl();
   if(sub==='questions') loadAdminQuestions();
   if(sub==='regs') loadAdminRegistrations();
+  if(sub==='team') loadAdminTeam();
 }
 
 /* =========================================================================
@@ -936,4 +938,117 @@ function renderAdminRegsTable(){
       '<td>' + (rec.examTaken ? rec.score + (rec.maxScore ? '/' + rec.maxScore : '') : '—') + '</td>';
     body.appendChild(tr);
   });
+}
+
+/* =========================================================================
+   👥 Team management  ·  টিম ম্যানেজমেন্ট  (Supabase table: team_members)
+   Drives the public Team section: members, convenors, volunteers, sponsors.
+   ========================================================================= */
+let adminTeamCache = [];
+
+async function loadAdminTeam(){
+  if(!adminLoggedIn) return;
+  const body = document.getElementById('tListBody');
+  body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;">… লোড হচ্ছে</td></tr>';
+  try{
+    adminTeamCache = await window.db.listTeamMembers();
+    renderTeamTable();
+  }catch(err){
+    console.error('Error fetching team members:', err);
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;">লোড করা যায়নি — ' + escapeHtml(err.message) + '</td></tr>';
+  }
+}
+
+function renderTeamTable(){
+  const body = document.getElementById('tListBody');
+  if(!window.db.active){
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;">⚠️ Supabase কনফিগার করা নেই — <code>supabase/SETUP.md</code> দেখো।</td></tr>';
+    return;
+  }
+  if(adminTeamCache.length === 0){
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;">তালিকা খালি — উপরের ফর্ম থেকে সদস্য যোগ করো। (SQL-এর বীজ-রোগুলো দেখতে <code>supabase/quick-fixes.sql</code> চালাও।)</td></tr>';
+    return;
+  }
+  body.innerHTML = '';
+  adminTeamCache.forEach(function(m, i){
+    const tr = document.createElement('tr');
+    const label = teamCategoryLabel(m.category);
+    tr.innerHTML = '<td>' + (i+1) + '</td>' +
+      '<td>' + escapeHtml(m.name) + (m.imageUrl ? ' <img src="' + escapeHtml(m.imageUrl) + '" alt="" width="28" height="28" style="object-fit:cover;border-radius:50%;vertical-align:middle;margin-left:6px;">' : '') + '</td>' +
+      '<td>' + escapeHtml(m.role || '—') + '</td>' +
+      '<td>' + escapeHtml(label.bn) + '</td>' +
+      '<td style="font-family:var(--f-mono);">' + (m.order || 0) + '</td>' +
+      '<td style="white-space:nowrap;">' +
+        '<button class="btn btn-ghost" style="padding:4px 10px;font-size:0.8rem;" onclick="editTeamMember(\'' + m.id + '\')"><span class="bn">✏️ সম্পাদনা</span><span class="en">Edit</span></button> ' +
+        '<button class="btn btn-ghost" style="padding:4px 10px;font-size:0.8rem;color:var(--clay-dark);" onclick="deleteTeamMemberConfirm(\'' + m.id + '\')"><span class="bn">🗑 মুছো</span><span class="en">Delete</span></button>' +
+      '</td>';
+    body.appendChild(tr);
+  });
+}
+
+function resetTeamForm(){
+  document.getElementById('tEditId').value = '';
+  ['tNameInput','tRoleInput','tImageUrlInput','tDistrictInput','tFacebookInput'].forEach(function(id){
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('tCategoryInput').value = 'organizer';
+  document.getElementById('tOrderInput').value = (adminTeamCache.length + 1);
+}
+
+function editTeamMember(id){
+  const m = adminTeamCache.find(function(x){ return x.id === id; });
+  if(!m) return;
+  document.getElementById('tEditId').value = m.id;
+  document.getElementById('tNameInput').value = m.name;
+  document.getElementById('tRoleInput').value = m.role;
+  document.getElementById('tCategoryInput').value = TEAM_CATEGORIES[m.category] ? m.category : 'organizer';
+  document.getElementById('tImageUrlInput').value = m.imageUrl;
+  document.getElementById('tDistrictInput').value = m.districtInstitute;
+  document.getElementById('tFacebookInput').value = m.facebookUrl;
+  document.getElementById('tOrderInput').value = m.order || 0;
+  document.getElementById('tMsg').innerHTML = '';
+  window.scrollTo({top: document.getElementById('adminTeam').offsetTop - 80, behavior:'smooth'});
+}
+
+async function saveTeamMemberForm(){
+  if(!adminLoggedIn) return;
+  const msg = document.getElementById('tMsg');
+  msg.innerHTML = '';
+  const m = {
+    name: document.getElementById('tNameInput').value.trim(),
+    role: document.getElementById('tRoleInput').value.trim(),
+    category: document.getElementById('tCategoryInput').value,
+    imageUrl: document.getElementById('tImageUrlInput').value.trim(),
+    districtInstitute: document.getElementById('tDistrictInput').value.trim(),
+    facebookUrl: document.getElementById('tFacebookInput').value.trim(),
+    order: parseInt(document.getElementById('tOrderInput').value, 10) || 0
+  };
+  if(!m.name){
+    msg.innerHTML = '<div class="msg err"><span class="bn">নাম অবশ্যই দাও।</span><span class="en">The name is required.</span></div>';
+    return;
+  }
+  try{
+    const editId = document.getElementById('tEditId').value;
+    await window.db.saveTeamMember(m, editId || null);
+    msg.innerHTML = '<div class="msg ok"><span class="bn">✅ সংরক্ষণ হয়েছে! সাইটের টিম অংশে এখনই দেখা যাবে।</span><span class="en">✅ Saved! It is on the public Team section right away.</span></div>';
+    resetTeamForm();
+    await loadAdminTeam();
+  }catch(err){
+    console.error('Error saving team member:', err);
+    msg.innerHTML = '<div class="msg err"><span class="bn">' + writeErrorBn(err) + '</span><span class="en">' + writeErrorEn(err) + '</span></div>';
+  }
+}
+
+async function deleteTeamMemberConfirm(id){
+  const m = adminTeamCache.find(function(x){ return x.id === id; });
+  const ok = window.confirm('তালিকা থেকে সরিয়ে দেবে?\n\nRemove from the team section?\n\n“' + ((m && m.name) || '') + '”');
+  if(!ok) return;
+  try{
+    await window.db.deleteTeamMember(id);
+    document.getElementById('tMsg').innerHTML = '<div class="msg ok"><span class="bn">মুছে গেছে।</span><span class="en">Deleted.</span></div>';
+    await loadAdminTeam();
+  }catch(err){
+    console.error('Error deleting team member:', err);
+    document.getElementById('tMsg').innerHTML = '<div class="msg err"><span class="bn">' + writeErrorBn(err) + '</span><span class="en">' + writeErrorEn(err) + '</span></div>';
+  }
 }

@@ -83,6 +83,7 @@
           <button class="tab-btn admin-sub-btn active" data-sub="timer" onclick="switchAdminSub('timer')"><span class="bn">পরীক্ষা নিয়ন্ত্রণ</span><span class="en">Exam Control</span></button>
           <button class="tab-btn admin-sub-btn" data-sub="questions" onclick="switchAdminSub('questions')"><span class="bn">প্রশ্ন ম্যানেজমেন্ট</span><span class="en">Questions</span></button>
           <button class="tab-btn admin-sub-btn" data-sub="regs" onclick="switchAdminSub('regs')"><span class="bn">রেজিস্ট্রেশন তালিকা</span><span class="en">Registrations</span></button>
+          <button class="tab-btn admin-sub-btn" data-sub="team" onclick="switchAdminSub('team')"><span class="bn">টিম ম্যানেজমেন্ট</span><span class="en">Team</span></button>
           <button class="tab-btn admin-sub-btn" data-sub="password" onclick="switchAdminSub('password')"><span class="bn">পাসওয়ার্ড সেটিংস</span><span class="en">Password Settings</span></button>
         </div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -335,6 +336,62 @@
             <button class="btn btn-ghost" onclick="loadExamControl()"><span class="bn">রিলোড করো</span><span class="en">Reload</span></button>
           </div>
           <div id="timerMsg"></div>
+        </div>
+      </div>
+
+      <!-- ============ Team management ============ -->
+      <div id="adminTeam" class="hidden">
+        <div class="form-box" style="max-width:100%;">
+          <h3 style="margin-top:0;"><span class="bn">👥 টিম ম্যানেজমেন্ট</span><span class="en">👥 Team Management</span></h3>
+          <p class="small-note bn" style="margin-top:0;">টিম সদস্য, আয়োয়ক, স্বেচ্ছাসেবক ও স্পন্সর — সব এখান থেকে যোগ/সম্পাদনা/মুছো। পরিবর্তন সাইটের "টিম" অংশে সঙ্গে সঙ্গে যায়। ছবির ঘরে লিংক দাও (যেমন <code>/images/muhit.jpg</code>) বা খালি রাখো।</p>
+          <p class="small-note en" style="margin-top:0;">Add / edit / delete members, convenors, volunteers and sponsors. Changes appear on the public Team section immediately. Put an image link (e.g. <code>/images/muhit.jpg</code>) in the image field, or leave it empty.</p>
+
+          <input type="hidden" id="tEditId">
+          <label><span class="bn">নাম *</span><span class="en">Name *</span></label>
+          <input id="tNameInput" style="width:100%;max-width:420px;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);">
+
+          <label style="margin-top:12px;"><span class="bn">ভূমিকা / পদবি</span><span class="en">Role / Title</span></label>
+          <input id="tRoleInput" placeholder="যেমন: আহ্বায়ক, যুগ্ম আহ্বায়ক, পৃষ্ঠপোষক" style="width:100%;max-width:420px;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);">
+
+          <label style="margin-top:12px;"><span class="bn">ক্যাটাগরি *</span><span class="en">Category *</span></label>
+          <select id="tCategoryInput" style="max-width:280px;padding:10px;">
+            <option value="title_sponsor">প্রধান সমন্বয়কারী ও টাইটেল স্পন্সর</option>
+            <option value="co_organizer">সহ-আয়োজক</option>
+            <option value="organizer">আয়োজক দল</option>
+            <option value="volunteer">স্বেচ্ছাসেবক</option>
+            <option value="sponsor">পৃষ্ঠপোষক</option>
+          </select>
+
+          <label style="margin-top:12px;"><span class="bn">ছবির লিংক</span><span class="en">Image URL</span></label>
+          <input id="tImageUrlInput" placeholder="/images/muhit.jpg বা https://…" style="width:100%;max-width:420px;padding:10px;font-family:var(--f-mono);border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);">
+
+          <label style="margin-top:12px;"><span class="bn">জেলা / প্রতিষ্ঠান</span><span class="en">District / Institute</span></label>
+          <input id="tDistrictInput" style="width:100%;max-width:420px;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);">
+
+          <label style="margin-top:12px;"><span class="bn">ফেসবুক প্রোফাইল লিংক</span><span class="en">Facebook URL</span></label>
+          <input id="tFacebookInput" placeholder="https://facebook.com/…" style="width:100%;max-width:420px;padding:10px;font-family:var(--f-mono);border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);">
+
+          <label style="margin-top:12px;"><span class="bn">ক্রম</span><span class="en">Order</span></label>
+          <input type="number" id="tOrderInput" min="0" style="width:120px;padding:10px;font-family:var(--f-mono);">
+
+          <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="saveTeamMemberForm()"><span class="bn">সংরক্ষণ করো</span><span class="en">Save</span></button>
+            <button class="btn btn-ghost" onclick="resetTeamForm()"><span class="bn">মুছে ফেলো</span><span class="en">Clear</span></button>
+            <button class="btn btn-ghost" onclick="loadAdminTeam()"><span class="bn">তালিকা রিফ্রেশ করো</span><span class="en">Refresh</span></button>
+          </div>
+          <div id="tMsg" style="margin-top:10px;"></div>
+
+          <div style="overflow-x:auto;margin-top:18px;">
+            <table class="lb">
+              <thead><tr>
+                <th>#</th><th><span class="bn">নাম</span><span class="en">Name</span></th>
+                <th><span class="bn">ভূমিকা</span><span class="en">Role</span></th>
+                <th><span class="bn">ক্যাটাগরি</span><span class="en">Category</span></th>
+                <th><span class="bn">ক্রম</span><span class="en">Order</span></th><th></th>
+              </tr></thead>
+              <tbody id="tListBody"><tr><td colspan="6" style="text-align:center;padding:24px;">…</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
