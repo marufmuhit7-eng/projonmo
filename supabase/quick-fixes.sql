@@ -108,30 +108,46 @@ update public.settings
 
 
 -- ------------------------------------------------- ৬) 🖼️ টিম-ফটো স্টোরেজ
--- পাবলিক `team-photos` বাল্টি: সবাই পড়তে পারবে (ছবি সাইটে দেখাতে),
--- কিন্তু আপলোড/বদল শুধু ☁️ সাইন-ইন করা আয়োয়ক পারবে।
--- ⚠️ খসড়ার "Public Insert/Update" বসানো হয়নি — তাহলে anon key জানা মাত্র
--- যে কেউ বাল্টিতে ইচ্ছেমতো ফাইল ভরতে পারত।
+-- ⚠️ লাইভ-প্রোব রায়: আপলোড ব্যর্থ হচ্ছিল কারণ বাল্টিটাই ছিল না (NoSuchBucket)।
+-- নিচের স্ক্রিপ্ট বাল্টি বানায় এবং আপনার চাওয়া অনুযায়ী ১০০% পাবলিক করে:
+-- যে কেউ ছবি দেখতে ও আপলোড করতে পারবে (☁️ সাইন-ইন ছাড়াই)।
 insert into storage.buckets (id, name, public)
 values ('team-photos', 'team-photos', true)
-on conflict (id) do nothing;
+on conflict (id) do update set public = true;
 
-drop policy if exists "Public Read team-photos" on storage.objects;
+drop policy if exists "Public Read team-photos"  on storage.objects;
+drop policy if exists "Public Insert team-photos" on storage.objects;
+drop policy if exists "Public Update team-photos" on storage.objects;
+drop policy if exists "Public Delete team-photos" on storage.objects;
+drop policy if exists "Organiser Insert team-photos" on storage.objects;
+drop policy if exists "Organiser Update team-photos" on storage.objects;
+drop policy if exists "Organiser Delete team-photos" on storage.objects;
+
+-- সবাই ছবি দেখতে পারবে
 create policy "Public Read team-photos" on storage.objects
   for select using (bucket_id = 'team-photos');
 
-drop policy if exists "Organiser Insert team-photos" on storage.objects;
-create policy "Organiser Insert team-photos" on storage.objects
-  for insert to authenticated with check (bucket_id = 'team-photos');
+-- সবাই (anon-সহ) আপলোড করতে পারবে
+create policy "Public Insert team-photos" on storage.objects
+  for insert with check (bucket_id = 'team-photos');
 
-drop policy if exists "Organiser Update team-photos" on storage.objects;
-create policy "Organiser Update team-photos" on storage.objects
-  for update to authenticated
-  using (bucket_id = 'team-photos') with check (bucket_id = 'team-photos');
+-- সবাই আপলোড করা ছবি বদলাতে/overwrite করতে পারবে
+create policy "Public Update team-photos" on storage.objects
+  for update using (bucket_id = 'team-photos') with check (bucket_id = 'team-photos');
 
-drop policy if exists "Organiser Delete team-photos" on storage.objects;
-create policy "Organiser Delete team-photos" on storage.objects
-  for delete to authenticated using (bucket_id = 'team-photos');
+-- ⚠️ সতর্কতা (সততার খাতিরে): এই খোলা পলিসিতে anon key জানা যে কেউ
+-- বাল্টিতে ইচ্ছেমতো ফাইল তুলতে বা আগের ছবি overwrite করতে পারবে।
+-- ইভেন্ট শেষে নিরাপত্তা ফিরিয়ে আনতে চাইলে নিচের ব্লকটা চালাও:
+--
+-- drop policy if exists "Public Insert team-photos" on storage.objects;
+-- drop policy if exists "Public Update team-photos" on storage.objects;
+-- create policy "Organiser Insert team-photos" on storage.objects
+--   for insert to authenticated with check (bucket_id = 'team-photos');
+-- create policy "Organiser Update team-photos" on storage.objects
+--   for update to authenticated using (bucket_id = 'team-photos')
+--   with check (bucket_id = 'team-photos');
+-- create policy "Organiser Delete team-photos" on storage.objects
+--   for delete to authenticated using (bucket_id = 'team-photos');
 
 -- 🧹 টেস্ট-রো পরিষ্কার: লাইভ-প্রোবে তৈরি হওয়া রোগুলো মুছে দাও —
 delete from public.registrations

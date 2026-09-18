@@ -101,6 +101,9 @@ function makeFakeSupabase() {
       from(bucket) {
         return {
           upload(path, file) {
+            if (file && file.name === 'nobucket.png') {
+              return Promise.resolve({ data: null, error: { message: 'Bucket not found', statusCode: 404 } });
+            }
             storageFiles[bucket + '/' + path] = file;
             return Promise.resolve({ data: { path: path }, error: null });
           },
@@ -362,6 +365,11 @@ function check(label, cond, detail) {
   try { await db.uploadTeamPhoto({ type: 'image/png', size: 6 * 1024 * 1024, name: 'big.png' }); }
   catch (e) { tooBig = e; }
   check('uploadTeamPhoto rejects files over 5 MB', !!tooBig);
+  let noBucket = null;
+  try { await db.uploadTeamPhoto({ type: 'image/png', size: 100, name: 'nobucket.png' }); }
+  catch (e) { noBucket = e; }
+  check('uploadTeamPhoto explains a missing bucket in Bangla (run the SQL)',
+    !!noBucket && /quick-fixes\.sql/.test(String(noBucket.message)), noBucket && noBucket.message);
 
   // ---- advisory board category ------------------------------------------------
   await db.saveTeamMember({ name: 'অধ্যাপক উপদেষ্টা', role: 'উপদেষ্টা', category: 'advisor', order: 1 });

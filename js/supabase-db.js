@@ -676,6 +676,16 @@
       if (res.error) throw res.error;
       var pub = client.storage.from('team-photos').getPublicUrl(path);
       return pub && pub.data ? pub.data.publicUrl : null;
+    }).catch(function (err) {
+      // Surface the real cause in Bangla instead of a cryptic SDK error.
+      var msg = String((err && err.message) || '');
+      if (/bucket not found|nosuchbucket/i.test(msg)) {
+        throw new Error('টিম-ফটো বাল্টি (team-photos) এখনো তৈরি হয়নি — Supabase SQL Editor-এ supabase/quick-fixes.sql চালাও');
+      }
+      if (/row-level security|permission|unauthorized|forbidden|401|403/i.test(msg)) {
+        throw new Error('ছবি আপলোডের অনুমতি নেই — ☁️ আয়োয়ক সাইন-ইন করো বা storage পলিসি চেক করো (supabase/quick-fixes.sql)');
+      }
+      throw err;
     });
   }
 
