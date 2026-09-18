@@ -170,7 +170,7 @@ function renderBackendNote(){
       '<span class="en">✅ <strong>Supabase</strong> is live — changes here reach <strong>every visitor\'s</strong> browser instantly.</span>';
     note.style.color = 'var(--sage)';
     if(window.db.windowSupported === false){
-      note.innerHTML += '<div class="small-note" style="margin-top:6px;color:var(--clay-dark);"><span class="bn">ℹ️ রেজিস্ট্রেশন-উইন্ডোর তারিখ কলাম ডেটাবেসে নেই — আপাতত ডিফল্ট (২৫ আগস্ট – ২০ সেপ্টেম্বর) চলছে। যোগ করতে <code>supabase/migrate-existing.sql</code> চালাও।</span><span class="en">ℹ️ The registration-window columns are missing — defaults (Aug 25 – Sep 20) are in use. Run <code>supabase/migrate-existing.sql</code> to add them.</span></div>';
+      note.innerHTML += '<div class="small-note" style="margin-top:6px;color:var(--clay-dark);"><span class="bn">ℹ️ রেজিস্ট্রেশন-উইন্ডোর তারিখ কলাম ডেটাবেসে নেই — আপাতত ডিফল্ট (২৫ আগস্ট – ২৯ সেপ্টেম্বর) চলছে। যোগ করতে <code>supabase/migrate-existing.sql</code> চালাও।</span><span class="en">ℹ️ The registration-window columns are missing — defaults (Aug 25 – Sep 29) are in use. Run <code>supabase/migrate-existing.sql</code> to add them.</span></div>';
     }
   }else{
     note.innerHTML =

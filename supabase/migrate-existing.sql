@@ -11,7 +11,7 @@
 -- 1) settings: রেজিস্ট্রেশন-উইন্ডোর তারিখ দুটি ------------------------------
 alter table public.settings
   add column if not exists registration_start date not null default '2026-08-25',
-  add column if not exists registration_end   date not null default '2026-09-20';
+  add column if not exists registration_end   date not null default '2026-09-29';
 
 -- 2) registrations: পিডি (UHF-আইডি), শ্রেণি/ক্যাটাগরি, পরীক্ষার স্কোর --------
 alter table public.registrations

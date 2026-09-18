@@ -174,7 +174,7 @@ The gate is now a single field, `isUnlocked`, and **only a literal boolean
 Two deliberate consequences:
 
 - **A passing date no longer opens the exam by itself.** The clock reaching
-  25 Sep 2026 is not consent; an organiser flips the switch. This prevents a
+  30 Sep 2026 is not consent; an organiser flips the switch. This prevents a
   wrong date, or a visitor's wrong device clock, from opening the exam.
 - **Locking mid-exam takes effect immediately.** the realtime listener pushes the change
   and any in-progress attempt is torn down on every screen at once.
@@ -192,8 +192,8 @@ through Supabase (Postgres + Realtime). One row drives the gate:
 
 ```
 settings (id = 'exam')
-  is_unlocked false, exam_date '2026-09-25T00:00:00+06',
-  registration_start '2026-08-25', registration_end '2026-09-20'
+  is_unlocked false, exam_date '2026-09-30T00:00:00+06',
+  registration_start '2026-08-25', registration_end '2026-09-29'
 ```
 
 1. Supabase → new project (region: Southeast Asia / Singapore).

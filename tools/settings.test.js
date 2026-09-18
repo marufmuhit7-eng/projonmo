@@ -32,9 +32,9 @@ function check(label, cond, detail) {
   const d = await S.load();
   check('SHIPPED DEFAULT: exam is LOCKED', d.isUnlocked === false, d);
   check('default examStatus is "countdown", never "live"', S.examStatus(d) === 'countdown');
-  check('default examDate is 25 Sep 2026 +06:00', d.examDate === '2026-09-25T00:00:00+06:00', d.examDate);
-  check('default registration window is Aug 25 – Sep 20, 2026',
-    d.registrationStart === '2026-08-25' && d.registrationEnd === '2026-09-20', d);
+  check('default examDate is 30 Sep 2026 +06:00', d.examDate === '2026-09-30T00:00:00+06:00', d.examDate);
+  check('default registration window is Aug 25 – Sep 29, 2026',
+    d.registrationStart === '2026-08-25' && d.registrationEnd === '2026-09-29', d);
 
   // ---- the gate: only a real boolean true opens the exam ----------------
   check('examStatus({isUnlocked:true}) is "live"', S.examStatus({ isUnlocked: true }) === 'live');
@@ -64,13 +64,13 @@ function check(label, cond, detail) {
 
   // ---- datetime-local <-> ISO, normal and boundary cases -----------------
   check('toDhakaInput: midnight Dhaka renders as 00:00, not shifted',
-    S.toDhakaInput('2026-09-25T00:00:00+06:00') === '2026-09-25T00:00');
+    S.toDhakaInput('2026-09-30T00:00:00+06:00') === '2026-09-30T00:00');
   check('fromDhakaInput: form value gains the +06:00 offset',
-    S.fromDhakaInput('2026-09-25T00:00') === '2026-09-25T00:00:00+06:00');
+    S.fromDhakaInput('2026-09-30T00:00') === '2026-09-30T00:00:00+06:00');
   check('round trip ISO -> input -> ISO is stable',
     S.fromDhakaInput(S.toDhakaInput('2026-12-31T18:30:00+06:00')) === '2026-12-31T18:30:00+06:00');
   check('boundary: a UTC instant is converted INTO Dhaka time (+6h)',
-    S.toDhakaInput('2026-09-24T18:00:00Z') === '2026-09-25T00:00');
+    S.toDhakaInput('2026-09-29T18:00:00Z') === '2026-09-30T00:00');
   check('boundary: month end rolls over correctly',
     S.toDhakaInput('2026-01-31T20:00:00Z') === '2026-02-01T02:00');
   check('boundary: leap day survives the round trip',
@@ -91,8 +91,8 @@ function check(label, cond, detail) {
 
   // ---- Bengali date rendering --------------------------------------------
   check('formatBnDateTime renders Bangla digits and month',
-    S.formatBnDateTime('2026-09-25T00:00:00+06:00') === '২৫ সেপ্টেম্বর, ২০২৬, ১২:০০ AM',
-    S.formatBnDateTime('2026-09-25T00:00:00+06:00'));
+    S.formatBnDateTime('2026-09-30T00:00:00+06:00') === '৩০ সেপ্টেম্বর, ২০২৬, ১২:০০ AM',
+    S.formatBnDateTime('2026-09-30T00:00:00+06:00'));
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);

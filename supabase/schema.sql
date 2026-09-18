@@ -21,15 +21,15 @@
 create table if not exists public.settings (
   id                  text        primary key default 'exam',
   is_unlocked         boolean     not null default false,   -- 🔒 default LOCKED
-  exam_date           timestamptz not null default '2026-09-25T00:00:00+06',
+  exam_date           timestamptz not null default '2026-09-30T00:00:00+06',
   registration_start  date        not null default '2026-08-25',
-  registration_end    date        not null default '2026-09-20',
+  registration_end    date        not null default '2026-09-29',
   updated_at          timestamptz not null default now(),
   constraint settings_single_row check (id = 'exam')
 );
 
 insert into public.settings (id, is_unlocked, exam_date, registration_start, registration_end)
-values ('exam', false, '2026-09-25T00:00:00+06', '2026-08-25', '2026-09-20')
+values ('exam', false, '2026-09-30T00:00:00+06', '2026-08-25', '2026-09-29')
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------- 2. questions

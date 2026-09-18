@@ -66,7 +66,7 @@
     return String(str).replace(/\d/g, function (d) { return BN_DIGITS[Number(d)]; });
   }
 
-  /** '2026-09-25T00:00:00+06:00' -> '২৫ সেপ্টেম্বর, ২০২৬, ১২:০০ AM' (Dhaka time). */
+  /** '2026-09-30T00:00:00+06:00' -> '৩০ সেপ্টেম্বর, ২০২৬, ১২:০০ AM' (Dhaka time). */
   function formatBnDateTime(iso) {
     var local = toDhakaInput(iso);
     if (!local) return '';

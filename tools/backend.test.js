@@ -197,7 +197,7 @@ function check(label, cond, detail) {
   let ctrl = await db.getControl();
   check('empty settings table resolves LOCKED (fail-closed)', ctrl.isUnlocked === false, ctrl);
   check('defaults carry the official dates',
-    ctrl.examDate === '2026-09-25T00:00:00+06:00' && ctrl.registrationStart === '2026-08-25', ctrl);
+    ctrl.examDate === '2026-09-30T00:00:00+06:00' && ctrl.registrationStart === '2026-08-25', ctrl);
 
   // ---- realtime: refetch on settings change ------------------------------
   const stop = db.onControl(function () { /* refetch path */ });
@@ -208,7 +208,7 @@ function check(label, cond, detail) {
   await db.saveControl({ isUnlocked: true });
   check('saveControl persists the unlock', (await db.getControl()).isUnlocked === true);
   check('saveControl merged — examDate untouched by the unlock',
-    (await db.getControl()).examDate === '2026-09-25T00:00:00+06:00');
+    (await db.getControl()).examDate === '2026-09-30T00:00:00+06:00');
 
   await db.saveControl({ examDate: '2026-10-16T10:00:00+06:00', registrationEnd: '2026-10-01' });
   ctrl = await db.getControl();
@@ -285,7 +285,7 @@ function check(label, cond, detail) {
   const saved = await db.saveExamResult('UHF000001', {
     name: 'রাফি', school: 'স্কুল', area: 'রংপুর',
     examTaken: true, score: 80, maxScore: 100, timeTakenSec: 320,
-    category: 'primary', submittedAt: '2026-09-25T10:05:00+06:00'
+    category: 'primary', submittedAt: '2026-09-30T10:05:00+06:00'
   });
   check('saveExamResult resolves true', saved === true);
   const after = await db.findRegistration('UHF000001');

@@ -210,10 +210,11 @@ function renderExamGate(s){
   const startAt = new Date(s.examDate);
   if(new Date() < startAt){
     lockedBn.textContent =
+      'অনলাইন প্রিলিমিনারি পরীক্ষা / বাছাই পর্ব ' +
       window.examSettings.formatBnDateTime(s.examDate) +
-      ' তারিখ থেকে পরীক্ষা শুরু হবে। এই সময়ের আগে পরীক্ষায় অংশ নেওয়া যাবে না। নিচে কতক্ষণ বাকি তা দেখা যাচ্ছে:';
+      ' তারিখে অনুষ্ঠিত হবে। এই সময়ের আগে পরীক্ষায় অংশ নেওয়া যাবে না। নিচে কতক্ষণ বাকি তা দেখা যাচ্ছে:';
     lockedEn.textContent =
-      'The exam opens on ' + startAt.toLocaleString('en-GB', { dateStyle: 'long', timeStyle: 'short' }) +
+      'The online preliminary / selection round takes place on ' + startAt.toLocaleString('en-GB', { dateStyle: 'long', timeStyle: 'short' }) +
       '. You cannot take the exam before this time. Time remaining is shown below:';
     tickCountdown();
     countdownInterval = setInterval(tickCountdown, 1000);
