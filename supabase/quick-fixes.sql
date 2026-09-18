@@ -106,6 +106,33 @@ update public.settings
        updated_at         = now()
  where id = 'exam';
 
+
+-- ------------------------------------------------- ৬) 🖼️ টিম-ফটো স্টোরেজ
+-- পাবলিক `team-photos` বাল্টি: সবাই পড়তে পারবে (ছবি সাইটে দেখাতে),
+-- কিন্তু আপলোড/বদল শুধু ☁️ সাইন-ইন করা আয়োয়ক পারবে।
+-- ⚠️ খসড়ার "Public Insert/Update" বসানো হয়নি — তাহলে anon key জানা মাত্র
+-- যে কেউ বাল্টিতে ইচ্ছেমতো ফাইল ভরতে পারত।
+insert into storage.buckets (id, name, public)
+values ('team-photos', 'team-photos', true)
+on conflict (id) do nothing;
+
+drop policy if exists "Public Read team-photos" on storage.objects;
+create policy "Public Read team-photos" on storage.objects
+  for select using (bucket_id = 'team-photos');
+
+drop policy if exists "Organiser Insert team-photos" on storage.objects;
+create policy "Organiser Insert team-photos" on storage.objects
+  for insert to authenticated with check (bucket_id = 'team-photos');
+
+drop policy if exists "Organiser Update team-photos" on storage.objects;
+create policy "Organiser Update team-photos" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'team-photos') with check (bucket_id = 'team-photos');
+
+drop policy if exists "Organiser Delete team-photos" on storage.objects;
+create policy "Organiser Delete team-photos" on storage.objects
+  for delete to authenticated using (bucket_id = 'team-photos');
+
 -- 🧹 টেস্ট-রো পরিষ্কার: লাইভ-প্রোবে তৈরি হওয়া রোগুলো মুছে দাও —
 delete from public.registrations
  where name in ('probeA','probeB','probe','cat-প্রোব (মুছে দাও)');

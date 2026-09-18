@@ -329,13 +329,22 @@
           <select id="tCategoryInput" style="max-width:280px;padding:10px;">
             <option value="title_sponsor">প্রধান সমন্বয়কারী ও টাইটেল স্পন্সর</option>
             <option value="co_organizer">সহ-আয়োজক</option>
+            <option value="advisor">উপদেষ্টা পরিষদ</option>
             <option value="organizer">আয়োজক দল</option>
             <option value="volunteer">স্বেচ্ছাসেবক</option>
             <option value="sponsor">পৃষ্ঠপোষক</option>
           </select>
 
-          <label style="margin-top:12px;"><span class="bn">ছবির লিংক</span><span class="en">Image URL</span></label>
-          <input id="tImageUrlInput" placeholder="/images/muhit.jpg বা https://…" style="width:100%;max-width:420px;padding:10px;font-family:var(--f-mono);border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);">
+          <label style="margin-top:12px;"><span class="bn">ছবি (ফাইল থেকে সরাসরি আপলোড)</span><span class="en">Photo (direct upload)</span></label>
+          <input type="file" id="tPhotoInput" accept="image/png,image/jpeg,image/webp,image/gif" onchange="handleTeamPhotoSelect()" style="max-width:420px;padding:8px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);font-size:0.85rem;">
+          <p class="small-note bn" style="margin-top:4px;">PNG / JPG / WebP, সর্বোচ্চ ৫ MB — সরাসরি Supabase Storage-এর <code>team-photos</code> বাল্টিতে সেভ হবে (আপলোডে ☁️ সাইন-ইন লাগবে)।</p>
+          <p class="small-note en" style="margin-top:2px;">PNG / JPG / WebP up to 5 MB — uploaded straight to the Supabase Storage <code>team-photos</code> bucket (needs the ☁️ sign-in).</p>
+          <div id="tPhotoPreviewWrap" style="margin-top:8px;" hidden>
+            <img id="tPhotoPreview" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:50%;border:2px solid var(--brass);box-shadow:0 0 0 2px var(--indigo-deep);">
+          </div>
+
+          <label style="margin-top:10px;"><span class="bn">অথবা ছবির সরাসরি লিংক (ঐচ্ছিক)</span><span class="en">or direct image URL (optional)</span></label>
+          <input id="tImageUrlInput" placeholder="/images/muhit.jpg" style="width:100%;max-width:420px;padding:10px;font-family:var(--f-mono);border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);">
 
           <label style="margin-top:12px;"><span class="bn">জেলা / প্রতিষ্ঠান</span><span class="en">District / Institute</span></label>
           <input id="tDistrictInput" style="width:100%;max-width:420px;padding:10px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;background:var(--cream);">

@@ -210,7 +210,8 @@ function getCategoryKey(clsValue){
 /* ---------- Team categories (shared by the site and the admin panel) ---------- */
 const TEAM_CATEGORIES = {
   title_sponsor: { bn: 'প্রধান সমন্বয়কারী ও টাইটেল স্পন্সর', en: 'Lead Coordinator & Title Sponsor', block: 'tier-title' },
-  co_organizer:  { bn: 'সহ-আয়োজক',                        en: 'Co-Organizer',                        block: 'tier-co'   },
+  co_organizer:  { bn: 'সহ-আয়োয়ক',                        en: 'Co-Organizer',                        block: 'tier-co'   },
+  advisor:       { bn: 'উপদেষ্টা পরিষদ',                    en: 'Advisory Board',                      block: 'people'    },
   organizer:     { bn: 'আয়োজক দল',                         en: 'Organizing Committee',                 block: 'people'    },
   volunteer:     { bn: 'স্বেচ্ছাসেবক',                      en: 'Volunteers',                          block: 'people'    },
   sponsor:       { bn: 'আমাদের পৃষ্ঠপোষকবৃন্দ',             en: 'Our Sponsors',                        block: 'sponsor'   }

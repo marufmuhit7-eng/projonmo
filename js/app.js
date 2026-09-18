@@ -483,7 +483,7 @@ async function loadTeamSection(){
   }
   if(!Array.isArray(members) || members.length === 0) return;
 
-  const ORDER = ['title_sponsor', 'co_organizer', 'organizer', 'volunteer', 'sponsor'];
+  const ORDER = ['title_sponsor', 'co_organizer', 'advisor', 'organizer', 'volunteer', 'sponsor'];
   const groups = {};
   members.forEach(function(m){
     const cat = m.category || 'core';

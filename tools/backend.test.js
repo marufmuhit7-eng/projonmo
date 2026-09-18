@@ -95,7 +95,21 @@ function makeFakeSupabase() {
     return b;
   }
 
+  const storageFiles = {};   // path -> file (shared with the test body)
   const client = {
+    storage: {
+      from(bucket) {
+        return {
+          upload(path, file) {
+            storageFiles[bucket + '/' + path] = file;
+            return Promise.resolve({ data: { path: path }, error: null });
+          },
+          getPublicUrl(path) {
+            return { data: { publicUrl: 'https://fake.supabase.co/storage/v1/object/public/' + bucket + '/' + path } };
+          }
+        };
+      }
+    },
     from(table) { return builder(table, 'select', null); },
     rpc(name, params) {
       return Promise.resolve().then(function () {
@@ -165,6 +179,7 @@ function makeFakeSupabase() {
       }
     }
   };
+  client._storageFiles = storageFiles;
   return client;
 }
 
@@ -334,6 +349,25 @@ function check(label, cond, detail) {
   await db.deleteTeamMember(firstId);
   const team3 = await db.listTeamMembers();
   check('team: delete removes the row', team3.length === 1 && team3[0].category === 'sponsor');
+
+  // ---- team photo upload (Storage) -----------------------------------------
+  const up1 = await db.uploadTeamPhoto({ type: 'image/png', size: 1024, name: 'photo.PNG' });
+  check('uploadTeamPhoto returns a public team-photos URL',
+    /^https:\/\/fake\.supabase\.co\/storage\/v1\/object\/public\/team-photos\/team\/.+\.png$/.test(up1), up1);
+  let nonImage = null;
+  try { await db.uploadTeamPhoto({ type: 'application/pdf', size: 10, name: 'x.pdf' }); }
+  catch (e) { nonImage = e; }
+  check('uploadTeamPhoto rejects non-image files', !!nonImage);
+  let tooBig = null;
+  try { await db.uploadTeamPhoto({ type: 'image/png', size: 6 * 1024 * 1024, name: 'big.png' }); }
+  catch (e) { tooBig = e; }
+  check('uploadTeamPhoto rejects files over 5 MB', !!tooBig);
+
+  // ---- advisory board category ------------------------------------------------
+  await db.saveTeamMember({ name: 'অধ্যাপক উপদেষ্টা', role: 'উপদেষ্টা', category: 'advisor', order: 1 });
+  const team4 = await db.listTeamMembers();
+  check('team: advisor category round-trips through save/list',
+    team4.some(function(m){ return m.category === 'advisor'; }));
 
   stop();
 

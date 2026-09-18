@@ -991,6 +991,9 @@ function resetTeamForm(){
   ['tNameInput','tRoleInput','tImageUrlInput','tDistrictInput','tFacebookInput'].forEach(function(id){
     document.getElementById(id).value = '';
   });
+  document.getElementById('tPhotoInput').value = '';
+  document.getElementById('tPhotoPreviewWrap').hidden = true;
+  document.getElementById('tPhotoPreview').removeAttribute('src');
   document.getElementById('tCategoryInput').value = 'organizer';
   document.getElementById('tOrderInput').value = (adminTeamCache.length + 1);
 }
@@ -1006,8 +1009,46 @@ function editTeamMember(id){
   document.getElementById('tDistrictInput').value = m.districtInstitute;
   document.getElementById('tFacebookInput').value = m.facebookUrl;
   document.getElementById('tOrderInput').value = m.order || 0;
+  document.getElementById('tPhotoInput').value = '';
+  const pv = document.getElementById('tPhotoPreviewWrap');
+  const pvImg = document.getElementById('tPhotoPreview');
+  if(m.imageUrl){ pvImg.src = m.imageUrl; pv.hidden = false; }
+  else { pv.hidden = true; pvImg.removeAttribute('src'); }
   document.getElementById('tMsg').innerHTML = '';
   window.scrollTo({top: document.getElementById('adminTeam').offsetTop - 80, behavior:'smooth'});
+}
+
+/*
+ * Direct photo upload: file picker -> Supabase Storage (team-photos) ->
+ * the public URL lands in the URL field (kept editable as a fallback).
+ */
+async function handleTeamPhotoSelect(){
+  const input = document.getElementById('tPhotoInput');
+  const msg = document.getElementById('tMsg');
+  if(!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  if(!/^image\//.test(file.type || '')){
+    msg.innerHTML = '<div class="msg err"><span class="bn">ছবি ফাইল দাও (PNG / JPG / WebP)।</span><span class="en">Please choose an image file.</span></div>';
+    input.value = '';
+    return;
+  }
+  if(file.size > 5 * 1024 * 1024){
+    msg.innerHTML = '<div class="msg err"><span class="bn">ছবিটি ৫ MB-এর ছোট হতে হবে।</span><span class="en">The photo must be under 5 MB.</span></div>';
+    input.value = '';
+    return;
+  }
+  msg.innerHTML = '<div class="small-note"><span class="bn">ছবি আপলোড হচ্ছে…</span><span class="en">Uploading photo…</span></div>';
+  try{
+    const url = await window.db.uploadTeamPhoto(file);
+    document.getElementById('tImageUrlInput').value = url;
+    document.getElementById('tPhotoPreview').src = url;
+    document.getElementById('tPhotoPreviewWrap').hidden = false;
+    msg.innerHTML = '<div class="msg ok"><span class="bn">✅ ছবি আপলোড হয়েছে — এখন “সংরক্ষণ করো” চাপো।</span><span class="en">✅ Photo uploaded — now press Save.</span></div>';
+  }catch(err){
+    console.error('Error uploading team photo:', err);
+    input.value = '';
+    msg.innerHTML = '<div class="msg err"><span class="bn">' + writeErrorBn(err) + '</span><span class="en">' + writeErrorEn(err) + '</span></div>';
+  }
 }
 
 async function saveTeamMemberForm(){

@@ -653,6 +653,32 @@
     });
   }
 
+  /**
+   * Upload a member photo to the public `team-photos` Storage bucket and
+   * return its public URL. Validates type (image/*) and size (<= 5 MB);
+   * writes require the organiser sign-in (see the storage policies).
+   */
+  function uploadTeamPhoto(file) {
+    if (!active) return Promise.reject(new Error('Supabase কনফিগার করা নেই'));
+    if (!file || !/^image\//.test(String(file.type || ''))) {
+      return Promise.reject(new Error('ছবি ফাইল দাও (PNG / JPG / WebP)'));
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      return Promise.reject(new Error('ছবিটি ৫ MB-এর ছোট হতে হবে'));
+    }
+    var extMatch = /\.(jpe?g|png|webp|gif)$/i.exec(String(file.name || ''));
+    var ext = extMatch ? extMatch[1].toLowerCase() : (file.type.split('/')[1] || 'png');
+    var path = 'team/' + Date.now() + '-' +
+      Math.random().toString(36).slice(2, 8) + '.' + ext;
+    return client.storage.from('team-photos').upload(path, file, {
+      contentType: file.type, upsert: false, cacheControl: '3600'
+    }).then(function (res) {
+      if (res.error) throw res.error;
+      var pub = client.storage.from('team-photos').getPublicUrl(path);
+      return pub && pub.data ? pub.data.publicUrl : null;
+    });
+  }
+
   function deleteTeamMember(id) {
     if (!active) return Promise.reject(new Error('Supabase কনফিগার করা নেই'));
     return client.from('team_members').delete().eq('id', id).then(function (res) {
@@ -743,6 +769,7 @@
     listTeamMembers: listTeamMembers,
     saveTeamMember: saveTeamMember,
     deleteTeamMember: deleteTeamMember,
+    uploadTeamPhoto: uploadTeamPhoto,
     auth: authApi,
     get windowSupported() { return !!(settingsKeys && settingsKeys.indexOf('registration_start') !== -1); },
     _internal: { normControl: normControl, rowToControl: rowToControl, rowToQuestion: rowToQuestion, letterToIndex: letterToIndex }
