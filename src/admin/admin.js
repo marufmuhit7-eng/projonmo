@@ -149,12 +149,14 @@ function switchAdminSub(sub){
   document.getElementById('adminQuestions').classList.toggle('hidden', sub!=='questions');
   document.getElementById('adminTimer').classList.toggle('hidden', sub!=='timer');
   document.getElementById('adminRegs').classList.toggle('hidden', sub!=='regs');
+  document.getElementById('adminLb').classList.toggle('hidden', sub!=='lb');
   document.getElementById('adminTeam').classList.toggle('hidden', sub!=='team');
   document.getElementById('adminPassword').classList.toggle('hidden', sub!=='password');
   if(sub==='timer') loadExamControl();
   if(sub==='questions') loadAdminQuestions();
   if(sub==='regs') loadAdminRegistrations();
   if(sub==='team') loadAdminTeam();
+  if(sub==='lb') loadAdminLeaderboard();
 }
 
 /* =========================================================================
@@ -938,6 +940,104 @@ function renderAdminRegsTable(){
       '<td>' + (rec.examTaken ? rec.score + (rec.maxScore ? '/' + rec.maxScore : '') : '—') + '</td>';
     body.appendChild(tr);
   });
+}
+
+/* =========================================================================
+   🏆 Leaderboard / ফলাফল  ·  admin-only results table
+   ========================================================================= */
+let adminResultsCache = [];
+
+async function loadAdminLeaderboard(){
+  if(!adminLoggedIn) return;
+  const body = document.getElementById('adminLbBody');
+  body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;">… লোড হচ্ছে</td></tr>';
+  try{
+    adminResultsCache = await window.db.listAdminResults();
+    renderAdminResultsTable();
+  }catch(err){
+    console.error('Error fetching results:', err);
+    const denied = /row-level security|permission|jwt|401|403/i.test(String(err.message||''));
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;">' +
+      (denied
+        ? '<span class="bn">🔒 তালিকা পড়ার অনুমতি নেই — উপরের <strong>☁️ আয়োয়ক সাইন-ইন</strong> বক্সে সাইন-ইন করো।</span><span class="en">🔒 Read denied — sign in via the ☁️ box above.</span>'
+        : '<span class="bn">তালিকা লোড করা যায়নি: ' + escapeHtml(err.message) + '</span>') +
+      '</td></tr>';
+    return;
+  }
+  if(adminResultsCache.length === 0){
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;"><span class="bn">এখনো কেউ পরীক্ষা দেয়নি।</span><span class="en">Nobody has taken the exam yet.</span></td></tr>';
+  }
+}
+
+function renderAdminResultsTable(){
+  const body = document.getElementById('adminLbBody');
+  if(adminResultsCache.length === 0){
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;"><span class="bn">এখনো কেউ পরীক্ষা দেয়নি।</span><span class="en">Nobody has taken the exam yet.</span></td></tr>';
+    return;
+  }
+  body.innerHTML = '';
+  adminResultsCache.forEach(function(r, i){
+    const rank = i + 1;
+    const badgeClass = rank === 1 ? 'r1' : rank === 2 ? 'r2' : rank === 3 ? 'r3' : '';
+    const mins = Math.floor((r.timeTakenSec || 0) / 60), secs = (r.timeTakenSec || 0) % 60;
+    const duration = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    const whenRaw = r.submittedAt;
+    const when = typeof whenRaw === 'string' ? whenRaw.replace('T', ' ').slice(0, 16)
+      : (whenRaw && whenRaw.toDate ? whenRaw.toDate().toISOString().replace('T', ' ').slice(0, 16) : '—');
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td><span class="rank-badge ' + badgeClass + '">' + rank + '</span></td>' +
+      '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + (r.code ? escapeHtml(r.code) : '—') + '</td>' +
+      '<td>' + escapeHtml(r.name) + '</td>' +
+      '<td><strong>' + r.score + '</strong>' + (r.maxScore ? ' / ' + r.maxScore : '') + '</td>' +
+      '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + duration + ' · ' + when + '</td>';
+    body.appendChild(tr);
+  });
+}
+
+/** Printable view in a fresh window (Bangla-safe, no site chrome). */
+function printAdminResults(){
+  if(adminResultsCache.length === 0){ window.alert('প্রিন্ট করার মতো ফলাফল নেই।'); return; }
+  const rows = adminResultsCache.map(function(r, i){
+    const mins = Math.floor((r.timeTakenSec || 0) / 60), secs = (r.timeTakenSec || 0) % 60;
+    const duration = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    const when = typeof r.submittedAt === 'string' ? r.submittedAt.replace('T', ' ').slice(0, 16) : '—';
+    return '<tr><td style="text-align:center;">' + (i + 1) + '</td><td>' + escapeHtml(r.code || '—') + '</td><td>' +
+      escapeHtml(r.name) + '</td><td style="text-align:center;">' + r.score + (r.maxScore ? ' / ' + r.maxScore : '') +
+      '</td><td style="text-align:center;">' + duration + ' · ' + when + '</td></tr>';
+  }).join('');
+  const w = window.open('', '_blank');
+  if(!w){ window.alert('পপ-আপ ব্লক হয়েছে — ব্রাউজারে allow করো।'); return; }
+  w.document.write('<!DOCTYPE html><html lang="bn"><head><meta charset="UTF-8"><title>মেধাতালিকা — উত্তরবঙ্গ হেরিটেজ ফেস্ট</title>' +
+    '<style>body{font-family:"Noto Sans Bengali",sans-serif;padding:24px;color:#241C15;}' +
+    'h2{margin:0 0 4px;}p{margin:0 0 14px;color:#6b5d4d;}' +
+    'table{width:100%;border-collapse:collapse;font-size:14px;}th,td{border:1px solid #cbb98f;padding:8px 10px;}' +
+    'th{background:#f0e7cf;}</style></head><body>' +
+    '<h2>মেধাতালিকা — উত্তরবঙ্গ হেরিটেজ ফেস্ট ২০২৬</h2>' +
+    '<p>প্রিন্টের তারিখ: ' + new Date().toLocaleString('en-GB') + '</p>' +
+    '<table><thead><tr><th>মেধা ক্রম</th><th>রেজিস্ট্রেশন কোড</th><th>পরীক্ষার্থীর নাম</th><th>প্রাপ্ত নম্বর</th><th>সময় / জমা</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></body></html>');
+  w.document.close();
+  w.focus();
+  w.print();
+}
+
+/** CSV download (Excel-safe Bangla via BOM). */
+function exportAdminResultsCsv(){
+  if(adminResultsCache.length === 0){ window.alert('এক্সপোর্ট করার মতো ফলাফল নেই।'); return; }
+  const head = ['মেধা ক্রম', 'রেজিস্ট্রেশন কোড', 'নাম', 'প্রাপ্ত নম্বর', 'পূর্ণ নম্বর', 'সময়কাল (সেঃ)', 'জমা দেওয়ার সময়'];
+  const lines = adminResultsCache.map(function(r, i){
+    const when = typeof r.submittedAt === 'string' ? r.submittedAt : '';
+    return [i + 1, r.code || '', r.name || '', r.score, r.maxScore || '', r.timeTakenSec || 0, when]
+      .map(function(v){ return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+  });
+  const blob = new Blob(['\uFEFF' + head.join(',') + '\n' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'merit-list-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
 }
 
 /* =========================================================================

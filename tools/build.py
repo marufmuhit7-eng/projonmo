@@ -74,7 +74,7 @@ def supabase_configured() -> bool:
 PUBLIC_HEAD = f"""<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>উত্তরবঙ্গ হেরিটেজ ফেস্ট | Uttarbanga Heritage Fest</title>
-<meta name="description" content="উত্তরবঙ্গ হেরিটেজ ফেস্ট — প্রজন্ম ফাউন্ডেশন আয়োজিত অনলাইন হেরিটেজ কুইজ ও উৎসব। রেজিস্ট্রেশন, পরীক্ষা ও লিডারবোর্ড।">
+<meta name="description" content="উত্তরবঙ্গ হেরিটেজ ফেস্ট — প্রজন্ম ফাউন্ডেশন আয়োজিত অনলাইন হেরিটেজ কুইজ ও উৎসব। রেজিস্ট্রেশন ও অনলাইন পরীক্ষা।">
 <meta name="theme-color" content="#A6461E">
 <meta name="robots" content="index, follow">
 <meta property="og:type" content="website">

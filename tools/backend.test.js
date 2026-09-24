@@ -353,6 +353,15 @@ function check(label, cond, detail) {
   const team3 = await db.listTeamMembers();
   check('team: delete removes the row', team3.length === 1 && team3[0].category === 'sponsor');
 
+  // ---- admin results (leaderboard, admin-only) -------------------------------
+  const results = await db.listAdminResults();
+  check('admin results: exactly the exam-taken row is returned',
+    results.length === 1, results);
+  check('admin results: reg_code, score and timing mapped',
+    results[0].code === 'UHF000001' && results[0].score === 80 && results[0].timeTakenSec === 320, results[0]);
+  check('admin results: submission timestamp present',
+    !!results[0].submittedAt, results[0]);
+
   // ---- team photo upload (Storage) -----------------------------------------
   const up1 = await db.uploadTeamPhoto({ type: 'image/png', size: 1024, name: 'photo.PNG' });
   check('uploadTeamPhoto returns a public team-photos URL',
@@ -506,6 +515,8 @@ function check(label, cond, detail) {
 
   check('draft: leaderboard read tolerates a reduced shape',
     Array.isArray(await db2.listLeaderboard()));
+  check('draft: admin results fall back to the leaderboard table (empty here)',
+    (await db2.listAdminResults()).length === 0);
 
   // ---------------------------------------------------------------------
   // Mixed deployment: only a 5-param create_registration exists, returning

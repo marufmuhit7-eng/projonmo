@@ -599,6 +599,60 @@
     });
   }
 
+  /**
+   * Admin-only results table: everyone who took the exam, ranked by
+   * score DESC, then fastest completion, then earliest submission.
+   * Primary source is registrations (reg_code + submitted_at); if those
+   * columns are missing (draft schema) it falls back to the public
+   * leaderboard table.
+   */
+  function listAdminResults() {
+    if (!active) return Promise.resolve([]);
+    function fromRegistrations() {
+      return client.from('registrations')
+        .select('reg_code,pid,name,score,max_score,time_taken_sec,submitted_at,created_at,cls,category')
+        .eq('exam_taken', true)
+        .then(function (res) {
+          if (res.error) throw res.error;
+          return (res.data || []).map(function (r) {
+            return {
+              code: r.reg_code || r.pid || '',
+              name: r.name || '',
+              score: r.score || 0,
+              maxScore: r.max_score || 0,
+              timeTakenSec: r.time_taken_sec || 0,
+              submittedAt: r.submitted_at || r.created_at || null,
+              cls: r.cls || '',
+              category: r.category || null
+            };
+          });
+        });
+    }
+    function fromLeaderboard() {
+      return listLeaderboard().then(function (rows) {
+        return rows.map(function (r) {
+          return {
+            code: r.pid || '', name: r.name || '',
+            score: r.score || 0, maxScore: r.maxScore || 0,
+            timeTakenSec: r.timeTakenSec || 0,
+            submittedAt: null, cls: '', category: null
+          };
+        });
+      });
+    }
+    function rank(a, b) {
+      if (b.score !== a.score) return b.score - a.score;
+      if (a.timeTakenSec !== b.timeTakenSec) return a.timeTakenSec - b.timeTakenSec;
+      return String(a.submittedAt || '').localeCompare(String(b.submittedAt || ''));
+    }
+    return fromRegistrations()
+      .catch(function (err) {
+        if (!missingColumn(err)) throw err;
+        return fromLeaderboard();
+      })
+      .then(function (rows) { return rows.slice().sort(rank); });
+  }
+
   // ------------------------------------------------------------------ team
   function rowToTeamMember(r) {
     return {
@@ -776,6 +830,7 @@
     saveExamResult: saveExamResult,
     listRegistrations: listRegistrations,
     listLeaderboard: listLeaderboard,
+    listAdminResults: listAdminResults,
     listTeamMembers: listTeamMembers,
     saveTeamMember: saveTeamMember,
     deleteTeamMember: deleteTeamMember,

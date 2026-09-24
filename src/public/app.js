@@ -4,7 +4,6 @@ function switchTab(name){
   document.getElementById(name).classList.add('active');
   document.querySelectorAll('nav.topnav .tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
   window.scrollTo({top:0,behavior:'smooth'});
-  if(name==='leaderboard') loadLeaderboard();
   if(name==='exam') checkExamAvailability();
 }
 document.querySelectorAll('nav.topnav .tab-btn').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
@@ -411,58 +410,6 @@ async function submitExam(){
   document.getElementById('examResult').classList.remove('hidden');
   document.getElementById('resultScoreBox').textContent = `${score} / ${maxScore}`;
 }
-
-/* ---------- Leaderboard ---------- */
-let allLeaderboardRecords = [];
-let currentLbCategory = 'primary';
-
-async function loadLeaderboard(){
-  const body = document.getElementById('lbBody');
-  body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;">…</td></tr>';
-  try{
-    const records = await window.db.listLeaderboard();
-    allLeaderboardRecords = records.filter(r => r && r.examTaken);
-    renderLeaderboardTable(currentLbCategory);
-  }catch(err){
-    console.error(err);
-    body.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;">
-      <span class="bn">লিডারবোর্ড লোড করা যায়নি।</span><span class="en">Could not load the leaderboard.</span>
-    </td></tr>`;
-  }
-}
-
-function switchLbCategory(cat){
-  currentLbCategory = cat;
-  document.querySelectorAll('.lb-cat-btn').forEach(b=>b.classList.toggle('active', b.dataset.cat===cat));
-  renderLeaderboardTable(cat);
-}
-
-function renderLeaderboardTable(cat){
-  const body = document.getElementById('lbBody');
-  const catKey = cat || 'primary';
-  const records = allLeaderboardRecords
-    .filter(rec => (rec.category || getCategoryKey(rec.cls)) === catKey)
-    .sort((a,b)=> b.score - a.score || a.timeTakenSec - b.timeTakenSec);
-  if(records.length===0){
-    body.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;">
-      <span class="bn">এই ক্যাটাগরিতে এখনো কেউ পরীক্ষা দেয়নি।</span><span class="en">No one in this category has taken the exam yet.</span>
-    </td></tr>`;
-    return;
-  }
-  body.innerHTML = '';
-  records.forEach((rec,i)=>{
-    const rank = i+1;
-    const badgeClass = rank===1?'r1':rank===2?'r2':rank===3?'r3':'';
-    const mins = Math.floor(rec.timeTakenSec/60), secs = rec.timeTakenSec%60;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td><span class="rank-badge ${badgeClass}">${rank}</span></td>
-      <td>${rec.name}</td><td>${rec.school}</td><td>${rec.area||''}</td>
-      <td><strong>${rec.score}</strong>${rec.maxScore?` / ${rec.maxScore}`:''}</td>
-      <td>${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}</td>`;
-    body.appendChild(tr);
-  });
-}
-
 
 /* ---------- Team (dynamic from Supabase, falls back to the shipped markup) ---------- */
 

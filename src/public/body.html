@@ -8,7 +8,6 @@
       <button class="tab-btn active" data-tab="home"><span class="bn">হোম</span><span class="en">Home</span></button>
       <button class="tab-btn" data-tab="register"><span class="bn">রেজিস্ট্রেশন</span><span class="en">Register</span></button>
       <button class="tab-btn" data-tab="exam"><span class="bn">পরীক্ষা</span><span class="en">Exam</span></button>
-      <button class="tab-btn" data-tab="leaderboard"><span class="bn">লিডারবোর্ড</span><span class="en">Leaderboard</span></button>
       <button class="tab-btn" data-tab="team"><span class="bn">টিম</span><span class="en">Team</span></button>
       <button class="tab-btn" data-tab="info"><span class="bn">তথ্যকেন্দ্র</span><span class="en">Info</span></button>
     </div>
@@ -62,8 +61,8 @@
       </div>
       <div class="card">
         <h3><span class="bn">🏆 স্বয়ংক্রিয় র‍্যাংকিং</span><span class="en">🏆 Auto Ranking</span></h3>
-        <p class="bn">স্কোর ও সময়ের ভিত্তিতে সাথে সাথেই লিডারবোর্ডে তোমার অবস্থান দেখা যাবে।</p>
-        <p class="en">Your rank appears instantly on the leaderboard, based on score and completion time.</p>
+        <p class="bn">জমা দেওয়ার সঙ্গে সঙ্গেই স্কোর দেখা যাবে; চূড়ান্ত মেধাতালিকা প্রকাশ পাবে ইভেন্টের পাতায়।</p>
+        <p class="en">Your score appears instantly; the final merit list will be published on the event page.</p>
       </div>
     </div>
   </div>
@@ -91,7 +90,7 @@
       </div>
       <div class="t-item">
         <div class="t-date">২ অক্টোবর, ২০২৬ / Oct 2, 2026</div>
-        <h3><span class="bn">ফলাফল ও লিডারবোর্ড প্রকাশ</span><span class="en">Results &amp; Leaderboard Published</span></h3>
+        <h3><span class="bn">ফলাফল প্রকাশ</span><span class="en">Results Published</span></h3>
         <p class="bn">শীর্ষ অংশগ্রহণকারীদের চূড়ান্ত পর্বের জন্য জানানো হবে।</p>
         <p class="en">Top scorers will be notified for the final round.</p>
       </div>
@@ -216,7 +215,7 @@
           <li>প্রতিটি আইডি দিয়ে <strong>একবারই</strong> পরীক্ষা দেওয়া যাবে।</li>
           <li>উত্তর সিলেক্ট করার সাথে সাথেই সঠিক/ভুল দেখা যাবে।</li>
           <li>তোমার শ্রেণী অনুযায়ী প্রশ্ন আসবে — প্রাইমারি, জুনিয়র বা সিনিয়র।</li>
-          <li>জমা দেওয়ার পর ফলাফল লিডারবোর্ডে যোগ হবে।</li>
+          <li>জমা দেওয়ার পর ফলাফল সংরক্ষিত হবে।</li>
         </ol>
         <ol class="en" style="margin:0;padding-left:20px;font-size:0.88rem;line-height:1.75;">
           <li>All questions are multiple choice — four options, one correct.</li>
@@ -224,7 +223,7 @@
           <li>Each ID may attempt the exam <strong>once only</strong>.</li>
           <li>Correct or incorrect is shown the moment you pick an answer.</li>
           <li>Questions match your class group — Primary, Junior or Senior.</li>
-          <li>Your score is added to the leaderboard after you submit.</li>
+          <li>Your score is saved immediately after you submit.</li>
         </ol>
       </div>
 
@@ -249,43 +248,13 @@
       <h3 class="bn">তোমার ফলাফল</h3>
       <h3 class="en">Your Result</h3>
       <div class="pid-box" id="resultScoreBox"></div>
-      <p class="bn" style="margin-top:16px;">ফলাফল লিডারবোর্ডে আপডেট হয়ে গেছে। এখন গিয়ে নিজের অবস্থান দেখো!</p>
-      <p class="en" style="margin-top:16px;">Your result has been added to the leaderboard. Go check your rank!</p>
-      <button class="btn btn-ghost" onclick="switchTab('leaderboard')"><span class="bn">লিডারবোর্ড দেখো</span><span class="en">View Leaderboard</span></button>
+      <p class="bn" style="margin-top:16px;">ফলাফল সংরক্ষিত হয়ে গেছে। চূড়ান্ত মেধাতালিকা ইভেন্টের পাতায় প্রকাশ করা হবে।</p>
+      <p class="en" style="margin-top:16px;">Your result has been saved. The final merit list will be published on the event page.</p>
     </div>
   </div>
 </section>
 
 <!-- ================= LEADERBOARD ================= -->
-<section id="leaderboard">
-  <div class="wrap">
-    <div class="eyebrow"><span class="bn">র‍্যাংকিং</span><span class="en">Ranking</span></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-      <h2 style="margin:0;"><span class="bn">লিডারবোর্ড</span><span class="en">Leaderboard</span></h2>
-      <button class="btn btn-ghost" onclick="loadLeaderboard()"><span class="bn">রিফ্রেশ করো</span><span class="en">Refresh</span></button>
-    </div>
-    <p class="small-note bn">প্রতিটি ক্যাটাগরির লিডারবোর্ড আলাদা। স্কোরের ভিত্তিতে, সমান স্কোরে যে দ্রুত জমা দিয়েছে সে এগিয়ে থাকবে।</p>
-    <p class="small-note en">Each category has its own leaderboard. Ranked by score; ties are broken by faster completion time.</p>
-    <div class="tabs" style="margin-top:20px;border-bottom:1px solid rgba(36,28,21,0.12);padding-bottom:2px;">
-      <button class="tab-btn lb-cat-btn active" data-cat="primary" onclick="switchLbCategory('primary')"><span class="bn">প্রাইমারি</span><span class="en">Primary</span></button>
-      <button class="tab-btn lb-cat-btn" data-cat="junior" onclick="switchLbCategory('junior')"><span class="bn">জুনিয়র</span><span class="en">Junior</span></button>
-      <button class="tab-btn lb-cat-btn" data-cat="senior" onclick="switchLbCategory('senior')"><span class="bn">সিনিয়র</span><span class="en">Senior</span></button>
-    </div>
-    <div style="overflow-x:auto;margin-top:20px;">
-      <table class="lb">
-        <thead><tr>
-          <th><span class="bn">অবস্থান</span><span class="en">Rank</span></th>
-          <th><span class="bn">নাম</span><span class="en">Name</span></th>
-          <th><span class="bn">স্কুল</span><span class="en">School</span></th>
-          <th><span class="bn">জেলা</span><span class="en">District</span></th>
-          <th><span class="bn">স্কোর</span><span class="en">Score</span></th>
-          <th><span class="bn">সময়</span><span class="en">Time</span></th>
-        </tr></thead>
-        <tbody id="lbBody"><tr><td colspan="6" style="text-align:center;padding:30px;">…</td></tr></tbody>
-      </table>
-    </div>
-  </div>
-</section>
 
 <!-- ================= TEAM ================= -->
 <section id="team">
@@ -390,8 +359,8 @@
       </details>
       <details class="faq">
         <summary><span class="bn">ফলাফল কীভাবে ও কবে জানব?</span><span class="en">How and when will I know my result?</span></summary>
-        <p class="bn">পরীক্ষা জমা দেওয়ার সাথে সাথেই স্কোর দেখানো হবে এবং লিডারবোর্ডে অবস্থান আপডেট হয়ে যাবে। বিভাগীয় পর্যায়ের চূড়ান্ত ফলাফল আগামী ২ অক্টোবর, ২০২৬ এই ওয়েবসাইটেই প্রকাশ করা হবে।</p>
-        <p class="en">Your score appears instantly after submission, and your rank updates on the leaderboard right away. The final divisional-round results will be published on this website on September 27, 2026.</p>
+        <p class="bn">পরীক্ষা জমা দেওয়ার সাথে সাথেই স্কোর দেখানো হবে। বিভাগীয় পর্যায়ের চূড়ান্ত ফলাফল আগামী ২ অক্টোবর, ২০২৬ এই ওয়েবসাইটেই প্রকাশ করা হবে।</p>
+        <p class="en">Your score appears instantly after submission. The final divisional-round results will be published on this website on October 2, 2026.</p>
       </details>
     </div>
 

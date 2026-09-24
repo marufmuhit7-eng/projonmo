@@ -83,6 +83,7 @@
           <button class="tab-btn admin-sub-btn active" data-sub="timer" onclick="switchAdminSub('timer')"><span class="bn">পরীক্ষা নিয়ন্ত্রণ</span><span class="en">Exam Control</span></button>
           <button class="tab-btn admin-sub-btn" data-sub="questions" onclick="switchAdminSub('questions')"><span class="bn">প্রশ্ন ম্যানেজমেন্ট</span><span class="en">Questions</span></button>
           <button class="tab-btn admin-sub-btn" data-sub="regs" onclick="switchAdminSub('regs')"><span class="bn">রেজিস্ট্রেশন তালিকা</span><span class="en">Registrations</span></button>
+          <button class="tab-btn admin-sub-btn" data-sub="lb" onclick="switchAdminSub('lb')"><span class="bn">লিডারবোর্ড / ফলাফল</span><span class="en">Leaderboard</span></button>
           <button class="tab-btn admin-sub-btn" data-sub="team" onclick="switchAdminSub('team')"><span class="bn">টিম ম্যানেজমেন্ট</span><span class="en">Team</span></button>
           <button class="tab-btn admin-sub-btn" data-sub="password" onclick="switchAdminSub('password')"><span class="bn">পাসওয়ার্ড সেটিংস</span><span class="en">Password Settings</span></button>
         </div>
@@ -336,6 +337,32 @@
             <button class="btn btn-ghost" onclick="loadExamControl()"><span class="bn">রিলোড করো</span><span class="en">Reload</span></button>
           </div>
           <div id="timerMsg"></div>
+        </div>
+      </div>
+
+      <!-- ============ Leaderboard / results (admin-only) ============ -->
+      <div id="adminLb" class="hidden">
+        <div class="form-box" style="max-width:100%;">
+          <h3 style="margin-top:0;"><span class="bn">🏆 লিডারবোর্ড / ফলাফল</span><span class="en">🏆 Leaderboard / Results</span></h3>
+          <p class="small-note bn" style="margin-top:0;">পরীক্ষা দিয়েছে এমন সবার মেধাক্রম — সর্বোচ্চ নম্বর, সমান হলে দ্রুততম সময় অনুযায়ী। এই তালিকা শুধু অ্যাডমিন দেখতে পারে; পাবলিক সাইটে লিডারবোর্ড আর নেই।</p>
+          <p class="small-note en" style="margin-top:0;">Ranked by score, ties broken by fastest completion. Admin-only — the public leaderboard has been removed.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 16px;">
+            <button class="btn btn-ghost" onclick="loadAdminLeaderboard()"><span class="bn">রিফ্রেশ করো</span><span class="en">Refresh</span></button>
+            <button class="btn btn-primary" onclick="printAdminResults()"><span class="bn">🖨️ প্রিন্ট করো</span><span class="en">🖨️ Print</span></button>
+            <button class="btn btn-ghost" onclick="exportAdminResultsCsv()"><span class="bn">⬇️ CSV এক্সপোর্ট</span><span class="en">⬇️ Export CSV</span></button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="lb">
+              <thead><tr>
+                <th><span class="bn">মেধা ক্রম</span><span class="en">Rank</span></th>
+                <th><span class="bn">রেজিস্ট্রেশন কোড</span><span class="en">Reg. Code</span></th>
+                <th><span class="bn">পরীক্ষার্থীর নাম</span><span class="en">Name</span></th>
+                <th><span class="bn">প্রাপ্ত নম্বর</span><span class="en">Score</span></th>
+                <th><span class="bn">সময় / জমা দেওয়ার সময়</span><span class="en">Time / Submitted</span></th>
+              </tr></thead>
+              <tbody id="adminLbBody"><tr><td colspan="5" style="text-align:center;padding:30px;">…</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
