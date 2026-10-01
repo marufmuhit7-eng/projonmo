@@ -9,7 +9,7 @@
  * ----------------
  * The live database was created from the organiser's own draft SQL, so this
  * layer detects what actually exists and degrades gracefully:
- *   settings without registration_start/end  -> defaults (Aug 25 – Sep 29)
+ *   settings without registration_start/end  -> defaults (Aug 25 – Oct 4)
  *   registrations without pid/exam columns   -> uuid `id` becomes the
  *                                                participant ID; scores stay
  *                                                unsaved until the patch SQL
@@ -56,9 +56,9 @@
   // ------------------------------------------------------------- defaults
   var DEFAULT_CONTROL = {
     isUnlocked: false,                              // 🔒 THE LAW: locked unless told otherwise
-    examDate: '2026-09-30T00:00:00+06:00',
+    examDate: '2026-10-05T00:00:00+06:00',
     registrationStart: '2026-08-25',
-    registrationEnd: '2026-09-29'
+    registrationEnd: '2026-10-04'
   };
 
   var settingsKeys = null;      // column names seen on the settings row, once read

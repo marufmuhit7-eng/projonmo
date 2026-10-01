@@ -112,8 +112,8 @@ document.getElementById('regForm').addEventListener('submit', async function(e){
     try{ window.localStorage.setItem('uhf:myreg:'+code, JSON.stringify({pid:code,name})); }catch(e){ /* ignore */ }
     msgBox.innerHTML = `
       <div class="msg ok">
-        <span class="bn">রেজিস্ট্রেশন সফল হয়েছে!<br>আপনার কোড: <strong>${code}</strong><br>এই কোডটি সংরক্ষণ করুন।</span>
-        <span class="en">Registration successful!<br>Your code: <strong>${code}</strong><br>Please save this code.</span>
+        <span class="bn">রেজিস্ট্রেশন সফল হয়েছে!<br>আপনার কোড: <strong>${code}</strong><br>এই কোডটি সংরক্ষণ করুন। অনলাইন প্রিলিমিনারি পরীক্ষা / বাছাই পর্ব অনুষ্ঠিত হবে <strong>৫ অক্টোবর, ২০২৬</strong> তারিখে।</span>
+        <span class="en">Registration successful!<br>Your code: <strong>${code}</strong><br>Please save this code. The online preliminary / selection round takes place on <strong>5 October 2026</strong>.</span>
       </div>
       <div class="pid-box">${code}</div>`;
     document.getElementById('regForm').reset();

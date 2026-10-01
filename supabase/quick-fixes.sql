@@ -93,16 +93,16 @@ select * from (values
 ) as seed(name, role, category, image_url, district_institute, facebook_url, order_no)
 where not exists (select 1 from public.team_members);
 
--- ৫খ) 📅 নতুন অফিসিয়াল তারিখ: পরীক্ষা ৩০ সেপ্টেম্বর, রেজিস্ট্রেশন ২৯ সেপ্টেম্বর পর্যন্ত
+-- ৫খ) 📅 নতুন অফিসিয়াল তারিখ: পরীক্ষা ৫ অক্টোবর, রেজিস্ট্রেশন ৪ অক্টোবর পর্যন্ত
 -- কলামগুলো না থাকলে আগে যোগ হবে, তারপর লাইভ রো-টা নতুন তারিখে চলে যাবে।
 alter table public.settings
   add column if not exists registration_start date not null default '2026-08-25',
-  add column if not exists registration_end   date not null default '2026-09-29';
+  add column if not exists registration_end   date not null default '2026-10-04';
 
 update public.settings
-   set exam_date          = '2026-09-30T00:00:00+06',
+   set exam_date          = '2026-10-05T00:00:00+06',
        registration_start = '2026-08-25',
-       registration_end   = '2026-09-29',
+       registration_end   = '2026-10-04',
        updated_at         = now()
  where id = 'exam';
 
