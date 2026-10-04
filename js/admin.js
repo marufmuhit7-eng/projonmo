@@ -870,7 +870,7 @@ async function loadAdminRegistrations(){
   const note = document.getElementById('regsSourceNote');
   if(note){
     if(window.db.active){
-      note.innerHTML = '<span class="bn">✅ Supabase — যেকোনো ডিভাইস থেকে করা রেজিস্ট্রেশন এখানে আসছে। তালিকা খালি মনে হলে আগে ☁️ সাইন-ইন করো।</span><span class="en">✅ Supabase — registrations from every device land here.</span>';
+      note.innerHTML = '<span class="bn">ℹ️ নতুন প্রবাহে আগাম রেজিস্ট্রেশন নেই — পরীক্ষার সময়ের তথ্য ও স্কোর এখন <strong>লিডারবোর্ড / ফলাফল</strong> ট্যাবে যায়। নিচের তালিকাটি শুধু পুরনো (প্রি-রেজিস্ট্রেশন) ডেটা।</span><span class="en">ℹ️ The new flow has no pre-registration — exam-time details and scores now land in the <strong>Leaderboard / Results</strong> tab. This list shows legacy data only.</span>';
       note.style.color = 'var(--sage)';
     }else{
       note.innerHTML = '<span class="bn">⚠️ Supabase কনফিগার করা নেই — রেজিস্ট্রেশন কোথাও সেভ হচ্ছে না। <code>src/shared/supabase-config.js</code> পূরণ করো।</span><span class="en">⚠️ Supabase is not configured — registrations are not being saved anywhere.</span>';
@@ -987,7 +987,7 @@ function renderAdminResultsTable(){
     const tr = document.createElement('tr');
     tr.innerHTML = '<td><span class="rank-badge ' + badgeClass + '">' + rank + '</span></td>' +
       '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + (r.code ? escapeHtml(r.code) : '—') + '</td>' +
-      '<td>' + escapeHtml(r.name) + '</td>' +
+      '<td>' + escapeHtml(r.name) + (r.category ? ' <span class="small-note" style="font-size:0.72rem;color:rgba(36,28,21,0.55);">· ' + escapeHtml(r.category) + '</span>' : '') + '</td>' +
       '<td><strong>' + r.score + '</strong>' + (r.maxScore ? ' / ' + r.maxScore : '') + '</td>' +
       '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + duration + ' · ' + when + '</td>';
     body.appendChild(tr);
@@ -1014,7 +1014,7 @@ function printAdminResults(){
     'th{background:#f0e7cf;}</style></head><body>' +
     '<h2>মেধাতালিকা — উত্তরবঙ্গ হেরিটেজ ফেস্ট ২০২৬</h2>' +
     '<p>প্রিন্টের তারিখ: ' + new Date().toLocaleString('en-GB') + '</p>' +
-    '<table><thead><tr><th>মেধা ক্রম</th><th>রেজিস্ট্রেশন কোড</th><th>পরীক্ষার্থীর নাম</th><th>প্রাপ্ত নম্বর</th><th>সময় / জমা</th></tr></thead>' +
+    '<table><thead><tr><th>মেধা ক্রম</th><th>কোড / রেফারেন্স</th><th>পরীক্ষার্থীর নাম</th><th>প্রাপ্ত নম্বর</th><th>সময় / জমা</th></tr></thead>' +
     '<tbody>' + rows + '</tbody></table></body></html>');
   w.document.close();
   w.focus();
@@ -1024,7 +1024,7 @@ function printAdminResults(){
 /** CSV download (Excel-safe Bangla via BOM). */
 function exportAdminResultsCsv(){
   if(adminResultsCache.length === 0){ window.alert('এক্সপোর্ট করার মতো ফলাফল নেই।'); return; }
-  const head = ['মেধা ক্রম', 'রেজিস্ট্রেশন কোড', 'নাম', 'প্রাপ্ত নম্বর', 'পূর্ণ নম্বর', 'সময়কাল (সেঃ)', 'জমা দেওয়ার সময়'];
+  const head = ['মেধা ক্রম', 'কোড / রেফারেন্স', 'নাম', 'প্রাপ্ত নম্বর', 'পূর্ণ নম্বর', 'সময়কাল (সেঃ)', 'জমা দেওয়ার সময়'];
   const lines = adminResultsCache.map(function(r, i){
     const when = typeof r.submittedAt === 'string' ? r.submittedAt : '';
     return [i + 1, r.code || '', r.name || '', r.score, r.maxScore || '', r.timeTakenSec || 0, when]

@@ -178,6 +178,43 @@ drop policy if exists "Organiser Delete team-photos" on storage.objects;
 create policy "Organiser Delete team-photos" on storage.objects
   for delete to authenticated using (bucket_id = 'team-photos');
 
+
+-- ------------------------------------------------- ৭) 📝 পরীক্ষার সরাসরি-জমা
+-- নতুন প্রবাহ: আগাম রেজিস্ট্রেশন নেই — পরীক্ষার ঠিক আগে নাম/ক্যাটাগরি/মোবাইল
+-- নিয়ে এই টেবিলেই তথ্য ও স্কোর একসাথে জমা হয়।
+create table if not exists public.exam_submissions (
+  id              uuid    primary key default gen_random_uuid(),
+  name            text    not null,
+  category        text    not null,
+  phone           text    not null,
+  whatsapp        text    default '',
+  email           text    default '',
+  score           int     not null default 0,
+  total_questions int     not null default 0,
+  created_at      timestamptz not null default now()
+);
+
+create index if not exists exam_submissions_rank_idx
+  on public.exam_submissions (score desc, created_at asc);
+
+alter table public.exam_submissions enable row level security;
+
+-- যে কেউ (anon) পরীক্ষা জমা দিতে পারবে
+drop policy if exists "Public insert exam_submissions" on public.exam_submissions;
+create policy "Public insert exam_submissions" on public.exam_submissions
+  for insert to anon, authenticated with check (true);
+
+-- পাঠ: অ্যাডমিন প্যানেলের ফলাফল-ট্যাব পড়বে; ডুপ্লিকেট-গার্ডও ফোন চেক করে।
+-- ⚠️ নোট: নিচের পাবলিক-পাঠ পলিসিতে anon key জানা যে কেউ সবার নাম/মোবাইল
+-- পড়তে পারবে। শুধু আয়োয়ক-পাঠে আটকাতে চাইলে নিচের দুই লাইন বাদ দিয়ে
+-- কমেন্ট-করা ব্লকটা চালাও:
+drop policy if exists "Public read exam_submissions" on public.exam_submissions;
+create policy "Public read exam_submissions" on public.exam_submissions
+  for select to anon, authenticated using (true);
+-- drop policy if exists "Organiser read exam_submissions" on public.exam_submissions;
+-- create policy "Organiser read exam_submissions" on public.exam_submissions
+--   for select to authenticated using (true);
+
 -- =====================================================================
 --  6. RPC ফাংশন (security definer — নির্দিষ্ট কাজ ছাড়া কিছু করতে পারে না)
 -- =====================================================================

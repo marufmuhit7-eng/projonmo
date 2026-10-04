@@ -224,3 +224,13 @@ function escapeHtml(s){
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+
+/* ---------- Exam categories (candidate picks one right before the exam) ---------- */
+const EXAM_CATEGORIES = {
+  school:     { bn: 'ক — স্কুল পর্যায়',      en: 'School' },
+  college:    { bn: 'খ — কলেজ পর্যায়',     en: 'College' },
+  university: { bn: 'গ — বিশ্ববিদ্যালয় পর্যায়', en: 'University' }
+};
+function examCategoryLabel(cat){
+  return EXAM_CATEGORIES[cat] || { bn: cat, en: cat };
+}

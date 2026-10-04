@@ -15,7 +15,8 @@ function makeFakeSupabase() {
     questions:      new Map(),   // uuid -> row
     registrations:  new Map(),   // uuid -> row (pid is unique in the data)
     leaderboard:    new Map(),   // pid -> row
-    team_members:   new Map()    // uuid -> row
+    team_members:   new Map(),   // uuid -> row
+    exam_submissions: new Map()  // uuid -> row
   };
   const handlers = [];           // realtime postgres_changes handlers
   let autoId = 0;
@@ -41,6 +42,7 @@ function makeFakeSupabase() {
       delete() { op = 'delete'; payload = null; return b; },
       eq(col, val) { state.filters.push([col, val]); return b; },
       order(col, opts) { state.orderKey = col; state.orderAsc = !(opts && opts.ascending === false); return b; },
+      limit() { return b; },
       maybeSingle() { state.single = true; return b; },
       then(resolve, reject) {
         return Promise.resolve(run()).then(resolve, reject);
@@ -353,14 +355,26 @@ function check(label, cond, detail) {
   const team3 = await db.listTeamMembers();
   check('team: delete removes the row', team3.length === 1 && team3[0].category === 'sponsor');
 
+  // ---- new-flow exam submissions (no pre-registration) -----------------------
+  check('duplicate guard: unknown phone is clean',
+    (await db.findSubmissionByPhone('01700000000')) === false);
+  await db.saveExamSubmission({ name: 'সালমা', category: 'school', phone: '01711111111',
+    whatsapp: '01711111111', email: 's@x.co', score: 90, totalQuestions: 10 });
+  check('duplicate guard: submitted phone is detected',
+    (await db.findSubmissionByPhone('01711111111')) === true);
+  let noFields = null;
+  try { await db.saveExamSubmission({ name: '', category: 'school', phone: '01' }); }
+  catch (e) { noFields = e; }
+  check('saveExamSubmission rejects missing required fields', !!noFields);
+
   // ---- admin results (leaderboard, admin-only) -------------------------------
   const results = await db.listAdminResults();
-  check('admin results: exactly the exam-taken row is returned',
-    results.length === 1, results);
-  check('admin results: reg_code, score and timing mapped',
-    results[0].code === 'UHF000001' && results[0].score === 80 && results[0].timeTakenSec === 320, results[0]);
-  check('admin results: submission timestamp present',
-    !!results[0].submittedAt, results[0]);
+  check('admin results: new submission + legacy registration both returned',
+    results.length === 2, results);
+  check('admin results: submission ranks first with mapped fields',
+    results[0].name === 'সালমা' && results[0].score === 90 && results[0].category === 'school' && results[0].maxScore === 100, results[0]);
+  check('admin results: legacy registration row keeps its reg_code and timing',
+    results[1].code === 'UHF000001' && results[1].score === 80 && results[1].timeTakenSec === 320, results[1]);
 
   // ---- team photo upload (Storage) -----------------------------------------
   const up1 = await db.uploadTeamPhoto({ type: 'image/png', size: 1024, name: 'photo.PNG' });
@@ -398,11 +412,12 @@ function check(label, cond, detail) {
     settings:      ['id', 'is_unlocked', 'exam_date', 'updated_at'],
     questions:     ['id', 'question', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer', 'order_no', 'created_at'],
     registrations: ['id', 'name', 'email', 'phone', 'institute', 'district', 'created_at'],
-    leaderboard:   ['pid', 'name', 'score']
+    leaderboard:   ['pid', 'name', 'score'],
+    exam_submissions: []
   };
 
   function makeBareFake() {
-    const tables = { settings: new Map(), questions: new Map(), registrations: new Map(), leaderboard: new Map() };
+    const tables = { settings: new Map(), questions: new Map(), registrations: new Map(), leaderboard: new Map(), exam_submissions: new Map() };
     let autoId = 0;
     const missing = { code: '42703', message: 'column does not exist' };
     function checkCols(table, cols) {

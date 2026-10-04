@@ -600,14 +600,34 @@
   }
 
   /**
-   * Admin-only results table: everyone who took the exam, ranked by
-   * score DESC, then fastest completion, then earliest submission.
-   * Primary source is registrations (reg_code + submitted_at); if those
-   * columns are missing (draft schema) it falls back to the public
-   * leaderboard table.
+   * Admin-only results table. Primary source: exam_submissions (the new
+   * registration-free flow). Falls back to exam-taken registrations and
+   * finally the public leaderboard table for legacy data.
+   * Ranked by score DESC, then fastest completion, then earliest submission.
    */
   function listAdminResults() {
     if (!active) return Promise.resolve([]);
+    function fromSubmissions() {
+      return client.from('exam_submissions')
+        .select('name,category,phone,whatsapp,email,score,total_questions,created_at')
+        .then(function (res) {
+          if (res.error) throw res.error;
+          return (res.data || []).map(function (r) {
+            return {
+              code: '',                        // no reg_code in this flow
+              name: r.name || '',
+              category: r.category || '',
+              phone: r.phone || '',
+              whatsapp: r.whatsapp || '',
+              email: r.email || '',
+              score: r.score || 0,
+              maxScore: (r.total_questions || 0) * 10,
+              timeTakenSec: 0,
+              submittedAt: r.created_at || null
+            };
+          });
+        });
+    }
     function fromRegistrations() {
       return client.from('registrations')
         .select('reg_code,pid,name,score,max_score,time_taken_sec,submitted_at,created_at,cls,category')
@@ -618,12 +638,12 @@
             return {
               code: r.reg_code || r.pid || '',
               name: r.name || '',
+              category: r.category || r.cls || '',
+              phone: '', whatsapp: '', email: '',
               score: r.score || 0,
               maxScore: r.max_score || 0,
               timeTakenSec: r.time_taken_sec || 0,
-              submittedAt: r.submitted_at || r.created_at || null,
-              cls: r.cls || '',
-              category: r.category || null
+              submittedAt: r.submitted_at || r.created_at || null
             };
           });
         });
@@ -632,10 +652,9 @@
       return listLeaderboard().then(function (rows) {
         return rows.map(function (r) {
           return {
-            code: r.pid || '', name: r.name || '',
+            code: r.pid || '', name: r.name || '', category: '', phone: '', whatsapp: '', email: '',
             score: r.score || 0, maxScore: r.maxScore || 0,
-            timeTakenSec: r.timeTakenSec || 0,
-            submittedAt: null, cls: '', category: null
+            timeTakenSec: r.timeTakenSec || 0, submittedAt: null
           };
         });
       });
@@ -645,12 +664,74 @@
       if (a.timeTakenSec !== b.timeTakenSec) return a.timeTakenSec - b.timeTakenSec;
       return String(a.submittedAt || '').localeCompare(String(b.submittedAt || ''));
     }
-    return fromRegistrations()
-      .catch(function (err) {
-        if (!missingColumn(err)) throw err;
-        return fromLeaderboard();
+    // Merge every source that answers: new submissions first, legacy
+    // exam-taken registrations, then the old leaderboard table. A source
+    // that is missing (or blocked) just contributes nothing.
+    function attempt(fn) {
+      return fn().catch(function (err) {
+        if (!missingColumn(err)) {
+          console.warn('[supabase-db] one results source unavailable; skipping it.', err);
+        }
+        return [];
+      });
+    }
+    return attempt(fromSubmissions)
+      .then(function (subs) {
+        return attempt(fromRegistrations).then(function (regs) {
+          return attempt(fromLeaderboard).then(function (board) {
+            // Legacy rows can appear in both registrations and leaderboard;
+            // keep the first (richer) copy per code/person.
+            var seen = {};
+            var merged = [];
+            subs.concat(regs).concat(board).forEach(function (r) {
+              var key = r.code || ('n:' + r.name + ':' + r.phone);
+              if (seen[key]) return;
+              seen[key] = true;
+              merged.push(r);
+            });
+            return merged.sort(rank);
+          });
+        });
+      });
+  }
+
+  /** Has this mobile number already submitted an exam? (soft guard) */
+  function findSubmissionByPhone(phone) {
+    if (!active) return Promise.resolve(false);
+    return client.from('exam_submissions').select('id').eq('phone', phone).limit(1).maybeSingle()
+      .then(function (res) {
+        if (res.error) throw res.error;
+        return !!res.data;
       })
-      .then(function (rows) { return rows.slice().sort(rank); });
+      .catch(function (err) {
+        // A missing table/policy must never block the exam — log and allow.
+        console.warn('[supabase-db] duplicate check failed; allowing the attempt.', err);
+        return false;
+      });
+  }
+
+  /** New flow: save the candidate's details + score in one row. */
+  function saveExamSubmission(sub) {
+    if (!active) return Promise.reject(new Error('Supabase কনফিগার করা নেই'));
+    if (!sub || !sub.name || !sub.category || !sub.phone) {
+      return Promise.reject(new Error('নাম, ক্যাটাগরি ও মোবাইল নম্বর আবশ্যক'));
+    }
+    return client.from('exam_submissions').insert({
+      name: sub.name,
+      category: sub.category,
+      phone: sub.phone,
+      whatsapp: sub.whatsapp || '',
+      email: sub.email || '',
+      score: sub.score || 0,
+      total_questions: sub.totalQuestions || 0
+    }).then(function (res) {
+      if (res.error) throw res.error;
+    }).catch(function (err) {
+      if (missingColumn(err)) {
+        throw new Error('exam_submissions টেবিল এখনো নেই — Supabase SQL Editor-এ supabase/quick-fixes.sql চালাও');
+      }
+      throw err;
+    });
   }
 
   // ------------------------------------------------------------------ team
@@ -831,6 +912,8 @@
     listRegistrations: listRegistrations,
     listLeaderboard: listLeaderboard,
     listAdminResults: listAdminResults,
+    findSubmissionByPhone: findSubmissionByPhone,
+    saveExamSubmission: saveExamSubmission,
     listTeamMembers: listTeamMembers,
     saveTeamMember: saveTeamMember,
     deleteTeamMember: deleteTeamMember,

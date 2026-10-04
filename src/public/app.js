@@ -17,116 +17,8 @@ function bnDigits(n){
   return String(n).split('').map(c=>map[c]!==undefined?map[c]:c).join('');
 }
 
-/* ---------- Registration ---------- */
+/* ---------- Candidate info (collected on the exam page now) ---------- */
 let latestControl = null;   // last settings/examControl we heard about
-
-/** Badge above the form: is the registration window open right now? */
-function renderRegWindowNote(){
-  const note = document.getElementById('regWindowNote');
-  if(!note) return;
-  const s = latestControl || window.examSettings.current();
-  if(window.examSettings.registrationOpen(s)){
-    note.innerHTML = '<div class="msg ok"><span class="bn">✅ রেজিস্ট্রেশন চলছে — ' +
-      window.examSettings.formatBnDateTime(s.registrationStart + 'T00:00:00+06:00').split(',')[0] +
-      ' থেকে ' + window.examSettings.formatBnDateTime(s.registrationEnd + 'T00:00:00+06:00').split(',')[0] +
-      ' পর্যন্ত।</span><span class="en">✅ Registration is open.</span></div>';
-  }else{
-    note.innerHTML = '<div class="msg err"><span class="bn">⛔ রেজিস্ট্রেশন এখন বন্ধ। নির্ধারিত সময়: ' +
-      window.examSettings.formatBnDateTime(s.registrationStart + 'T00:00:00+06:00').split(',')[0] +
-      ' – ' + window.examSettings.formatBnDateTime(s.registrationEnd + 'T00:00:00+06:00').split(',')[0] +
-      '。</span><span class="en">⛔ Registration is closed right now.</span></div>';
-  }
-}
-
-/**
- * Map a failed registration write to a plain Bangla sentence plus the likely
- * fix. Supabase errors arrive as { message, code, hint } and are always
- * logged to the console too.
- */
-function registrationErrorTexts(err){
-  const msg = String((err && err.message) || '').toLowerCase();
-  const hint = String((err && err.hint) || '').toLowerCase();
-  const all = msg + ' ' + hint;
-  if(!window.db || !window.db.active){
-    return { bn: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন। (Supabase কনফিগার করা নেই)',
-             en: 'Registration failed. Please try again. (Supabase is not configured)' };
-  }
-  if(all.indexOf('could not find the table') !== -1 || all.indexOf('does not exist') !== -1 ||
-     all.indexOf('pgrst205') !== -1){
-    return { bn: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন। (কারণ: ডেটাবেস টেবিল তৈরি হয়নি — Supabase SQL Editor-এ supabase/schema.sql চালাও)',
-             en: 'Registration failed. Please try again. (Cause: tables missing — run supabase/schema.sql in the Supabase SQL Editor)' };
-  }
-  if(all.indexOf('row-level security') !== -1 || all.indexOf('permission') !== -1){
-    return { bn: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন। (কারণ: RLS পলিসি ঠিক নেই — supabase/schema.sql আবার চালাও)',
-             en: 'Registration failed. Please try again. (Cause: RLS policies missing — re-run supabase/schema.sql)' };
-  }
-  return { bn: 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।',
-           en: 'Registration failed. Please try again.' };
-}
-
-document.getElementById('regForm').addEventListener('submit', async function(e){
-  e.preventDefault();   // never reload the page mid-submit
-  const msgBox = document.getElementById('regMsg');
-  const btn = document.getElementById('regSubmitBtn');
-  const btnOriginal = btn.innerHTML;
-  msgBox.innerHTML = '';
-  const name=document.getElementById('r_name').value.trim();
-  const school=document.getElementById('r_school').value.trim();
-  const cls=document.getElementById('r_class').value;
-  const area=document.getElementById('r_area').value.trim();
-  const phone=document.getElementById('r_phone').value.trim();
-  const email=document.getElementById('r_email').value.trim();
-  if(!name||!school||!cls||!area||!phone){
-    msgBox.innerHTML = '<div class="msg err"><span class="bn">সব বাধ্যতামূলক ঘর পূরণ করো।</span><span class="en">Please fill all required fields.</span></div>';
-    return;
-  }
-  // The registration window is controlled globally from Supabase too.
-  if(!window.examSettings.registrationOpen(latestControl)){
-    msgBox.innerHTML = '<div class="msg err"><span class="bn">রেজিস্ট্রেশনের নির্ধারিত সময় শেষ হয়ে গেছে।</span><span class="en">The registration window has closed.</span></div>';
-    return;
-  }
-  const id = genId();   // internal reference only — never shown to the visitor
-  btn.disabled = true;
-  btn.innerHTML = '<span class="bn">জমা হচ্ছে…</span><span class="en">Submitting…</span>';
-  try{
-    const saved = await window.db.addRegistration({
-      pid:id, name, school, cls, area, phone, email,
-      category: getCategoryKey(cls)
-    });
-    /*
-     * 🔒 HARD RULE — the only thing a visitor may ever see as their code is
-     * a database-minted reg_code matching ^UHF\d{4,6}$ (UHF000001…).
-     * A uuid, a random token or anything else is REFUSED here, whatever the
-     * backend returned. No data.id, no result.id, no crypto.randomUUID().
-     */
-    const code = (saved && saved.pid) || '';
-    if(!/^UHF\d{4,6}$/.test(code)){
-      console.error('[registration] refusing to display a non-reg_code id:', code || '(nothing returned)');
-      msgBox.innerHTML = '<div class="msg err">' +
-        '<span class="bn">রেজিস্ট্রেশন সেভ হয়েছে ✅ কিন্তু ছোট কোডটি এখনই দেখানো যাচ্ছে না (ডেটাবেস আপডেট বাকি)। অনুগ্রহ করে <strong>০১৪১০৭৮৫১৫৫</strong> নম্বরে নিজের নাম ও মোবাইল নম্বর জানিয়ে কোডটি সংগ্রহ করো।</span>' +
-        '<span class="en">Your registration was saved ✅ but the short code cannot be shown yet (database update pending). Please contact the organisers to receive your code.</span>' +
-        '</div>';
-      return;   // finally{} below restores the button
-    }
-    // Cache our own code locally (a convenience copy, never the source of truth).
-    try{ window.localStorage.setItem('uhf:myreg:'+code, JSON.stringify({pid:code,name})); }catch(e){ /* ignore */ }
-    msgBox.innerHTML = `
-      <div class="msg ok">
-        <span class="bn">রেজিস্ট্রেশন সফল হয়েছে!<br>আপনার কোড: <strong>${code}</strong><br>এই কোডটি সংরক্ষণ করুন। অনলাইন প্রিলিমিনারি পরীক্ষা / বাছাই পর্ব অনুষ্ঠিত হবে <strong>৫ অক্টোবর, ২০২৬</strong> তারিখে।</span>
-        <span class="en">Registration successful!<br>Your code: <strong>${code}</strong><br>Please save this code. The online preliminary / selection round takes place on <strong>5 October 2026</strong>.</span>
-      </div>
-      <div class="pid-box">${code}</div>`;
-    document.getElementById('regForm').reset();
-    document.getElementById('examIdInput').value = code;
-  }catch(err){
-    console.error('[registration] failed:', (err && err.code) || '', err);
-    const t = registrationErrorTexts(err);
-    msgBox.innerHTML = '<div class="msg err"><span class="bn">' + t.bn + '</span><span class="en">' + t.en + '</span></div>';
-  }finally{
-    btn.disabled = false;
-    btn.innerHTML = btnOriginal;
-  }
-});
 
 /* ---------- Exam ---------- */
 
@@ -252,7 +144,6 @@ function tickCountdown(){
 unsubscribeExamSettings = window.examSettings.subscribe(function(s){
   examSettings = s;
   latestControl = s;
-  renderRegWindowNote();
   renderExamGate(s);
 });
 window.addEventListener('pagehide', function(){
@@ -293,37 +184,40 @@ async function startExam(){
     checkExamAvailability();
     return;
   }
-  const id = document.getElementById('examIdInput').value.trim().toUpperCase();
-  if(!id){
-    msgBox.innerHTML = '<div class="msg err"><span class="bn">আইডি লেখো।</span><span class="en">Please enter your ID.</span></div>';
+  const name = document.getElementById('c_name').value.trim();
+  const category = document.getElementById('c_category').value;
+  const phone = document.getElementById('c_phone').value.trim();
+  const whatsapp = document.getElementById('c_whatsapp').value.trim();
+  const email = document.getElementById('c_email').value.trim();
+  if(!name || !category || !phone){
+    msgBox.innerHTML = '<div class="msg err"><span class="bn">নাম, ক্যাটাগরি ও মোবাইল নম্বর অবশ্যই দাও।</span><span class="en">Name, category and mobile number are required.</span></div>';
     return;
   }
-  let record;
+  if(!/^[0-9+\-\s]{6,15}$/.test(phone)){
+    msgBox.innerHTML = '<div class="msg err"><span class="bn">মোবাইল নম্বরটি ঠিকভাবে দাও (যেমন 01XXXXXXXXX)।</span><span class="en">Please enter a valid mobile number.</span></div>';
+    return;
+  }
+  // Soft duplicate guard: one attempt per mobile number.
   try{
-    record = await window.db.findRegistration(id);
-  }catch(err){
-    record = null;
-  }
-  if(!record){
-    msgBox.innerHTML = '<div class="msg err"><span class="bn">এই আইডি খুঁজে পাওয়া যায়নি।</span><span class="en">This ID was not found.</span></div>';
+    const already = await window.db.findSubmissionByPhone(phone);
+    if(already){
+      msgBox.innerHTML = '<div class="msg err"><span class="bn">এই মোবাইল নম্বর দিয়ে ইতিমধ্যে পরীক্ষা জমা হয়েছে। প্রতি নম্বরে একবারই অংশ নেওয়া যাবে।</span><span class="en">An exam has already been submitted with this mobile number.</span></div>';
+      return;
+    }
+  }catch(e){ console.warn('[exam] duplicate check unavailable, continuing', e); }
+
+  const catLabel = examCategoryLabel(category);
+  currentParticipant = { name, category, phone, whatsapp, email };
+  currentCategory = category;
+  currentQuestions = await loadQuestionsForCategory(category);
+  if(!Array.isArray(currentQuestions) || currentQuestions.length === 0){
+    msgBox.innerHTML = '<div class="msg err"><span class="bn">এই ক্যাটাগরির জন্য এখনো কোনো প্রশ্ন যোগ করা হয়নি। শীঘ্রই আবার চেষ্টা করো।</span><span class="en">No questions have been added for this category yet.</span></div>';
     return;
   }
-  if(record.examTaken){
-    msgBox.innerHTML = '<div class="msg err"><span class="bn">তুমি ইতিমধ্যে পরীক্ষা দিয়েছ।</span><span class="en">You have already taken this exam.</span></div>';
-    return;
-  }
-  const catKey = getCategoryKey(record.cls);
-  if(!catKey){
-    msgBox.innerHTML = '<div class="msg err"><span class="bn">তোমার ক্যাটাগরি শনাক্ত করা যায়নি, রেজিস্ট্রেশন তথ্য যাচাই করো।</span><span class="en">Could not determine your category, please check your registration.</span></div>';
-    return;
-  }
-  currentParticipant = record;
-  currentCategory = catKey;
-  currentQuestions = await loadQuestionsForCategory(catKey);
   userAnswers = new Array(currentQuestions.length).fill(null);
   document.getElementById('examLogin').classList.add('hidden');
   document.getElementById('examBody').classList.remove('hidden');
-  document.getElementById('examParticipantName').textContent = record.name + ' (' + (record.pid || record.rowId) + ') — ' + CATEGORY_LABELS[catKey].bn;
+  document.getElementById('examParticipantName').textContent = name + ' — ' + catLabel.bn;
   renderQuestions();
   timeLeft = 600;
   examStartTime = Date.now();
@@ -389,23 +283,25 @@ async function submitExam(){
   currentQuestions.forEach((q,i)=>{ if(userAnswers[i]===q.correct) score += 10; });
   const maxScore = currentQuestions.length*10;
   const timeTakenSec = Math.round((Date.now()-examStartTime)/1000);
-  currentParticipant.examTaken = true;
-  currentParticipant.category = currentCategory;
-  currentParticipant.score = score;
-  currentParticipant.maxScore = maxScore;
-  currentParticipant.timeTakenSec = timeTakenSec;
-  currentParticipant.submittedAt = new Date().toISOString();
   try{
-    await window.db.saveExamResult(currentParticipant.pid || currentParticipant.rowId, {
+    await window.db.saveExamSubmission({
       name: currentParticipant.name,
-      school: currentParticipant.school || '',
-      area: currentParticipant.area || '',
-      examTaken: true, score, maxScore, timeTakenSec,
-      category: currentCategory,
-      submittedAt: currentParticipant.submittedAt
+      category: currentParticipant.category,
+      phone: currentParticipant.phone,
+      whatsapp: currentParticipant.whatsapp,
+      email: currentParticipant.email,
+      score: score,
+      totalQuestions: currentQuestions.length
     });
-  }catch(err){ console.error('Failed to save exam result', err); }
-
+  }catch(err){
+    console.error('Failed to save exam submission', err);
+    document.getElementById('examBody').classList.add('hidden');
+    document.getElementById('examResult').classList.remove('hidden');
+    document.getElementById('resultScoreBox').textContent = `${score} / ${maxScore}`;
+    const note = document.getElementById('examResult').querySelector('p.bn');
+    if(note) note.textContent = '⚠️ ফলাফল সেভ করা যায়নি (' + (err.message || 'নেটওয়ার্ক সমস্যা') + ') — অনুগ্রহ করে আয়োজকদের জানাও।';
+    return;
+  }
   document.getElementById('examBody').classList.add('hidden');
   document.getElementById('examResult').classList.remove('hidden');
   document.getElementById('resultScoreBox').textContent = `${score} / ${maxScore}`;
