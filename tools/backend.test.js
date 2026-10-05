@@ -358,21 +358,25 @@ function check(label, cond, detail) {
   // ---- new-flow exam submissions (no pre-registration) -----------------------
   check('duplicate guard: unknown phone is clean',
     (await db.findSubmissionByPhone('01700000000')) === false);
-  await db.saveExamSubmission({ name: 'সালমা', category: 'school', phone: '01711111111',
-    whatsapp: '01711111111', email: 's@x.co', score: 90, totalQuestions: 10 });
+  await db.saveExamSubmission({ name: 'সালমা', category: 'primary', district: 'রংপুর', school: 'স্কুল',
+    phone: '01711111111', whatsapp: '01711111111', email: 's@x.co', score: 90, totalQuestions: 10 });
   check('duplicate guard: submitted phone is detected',
     (await db.findSubmissionByPhone('01711111111')) === true);
   let noFields = null;
   try { await db.saveExamSubmission({ name: '', category: 'school', phone: '01' }); }
   catch (e) { noFields = e; }
   check('saveExamSubmission rejects missing required fields', !!noFields);
+  let noDistrict = null;
+  try { await db.saveExamSubmission({ name: 'x', category: 'primary', school: 's', phone: '01', whatsapp: '01' }); }
+  catch (e) { noDistrict = e; }
+  check('saveExamSubmission rejects a missing district', !!noDistrict);
 
   // ---- admin results (leaderboard, admin-only) -------------------------------
   const results = await db.listAdminResults();
   check('admin results: new submission + legacy registration both returned',
     results.length === 2, results);
   check('admin results: submission ranks first with mapped fields',
-    results[0].name === 'সালমা' && results[0].score === 90 && results[0].category === 'school' && results[0].maxScore === 100, results[0]);
+    results[0].name === 'সালমা' && results[0].score === 90 && results[0].category === 'primary' && results[0].district === 'রংপুর' && results[0].school === 'স্কুল' && results[0].maxScore === 100, results[0]);
   check('admin results: legacy registration row keeps its reg_code and timing',
     results[1].code === 'UHF000001' && results[1].score === 80 && results[1].timeTakenSec === 320, results[1]);
 

@@ -186,15 +186,17 @@ async function startExam(){
   }
   const name = document.getElementById('c_name').value.trim();
   const category = document.getElementById('c_category').value;
+  const district = document.getElementById('c_district').value;
+  const school = document.getElementById('c_school').value.trim();
   const phone = document.getElementById('c_phone').value.trim();
   const whatsapp = document.getElementById('c_whatsapp').value.trim();
   const email = document.getElementById('c_email').value.trim();
-  if(!name || !category || !phone){
-    msgBox.innerHTML = '<div class="msg err"><span class="bn">নাম, ক্যাটাগরি ও মোবাইল নম্বর অবশ্যই দাও।</span><span class="en">Name, category and mobile number are required.</span></div>';
+  if(!name || !category || !district || !school || !phone || !whatsapp){
+    msgBox.innerHTML = '<div class="msg err"><span class="bn">নাম, ক্যাটাগরি, জেলা, স্কুল, মোবাইল ও হোয়াটসঅ্যাপ নম্বর — সবগুলোই দিতে হবে।</span><span class="en">Name, category, district, school, mobile and WhatsApp numbers are all required.</span></div>';
     return;
   }
-  if(!/^[0-9+\-\s]{6,15}$/.test(phone)){
-    msgBox.innerHTML = '<div class="msg err"><span class="bn">মোবাইল নম্বরটি ঠিকভাবে দাও (যেমন 01XXXXXXXXX)।</span><span class="en">Please enter a valid mobile number.</span></div>';
+  if(!/^[0-9+\-\s]{6,15}$/.test(phone) || !/^[0-9+\-\s]{6,15}$/.test(whatsapp)){
+    msgBox.innerHTML = '<div class="msg err"><span class="bn">মোবাইল / হোয়াটসঅ্যাপ নম্বর ঠিকভাবে দাও (যেমন 01XXXXXXXXX)।</span><span class="en">Please enter valid mobile / WhatsApp numbers.</span></div>';
     return;
   }
   // Soft duplicate guard: one attempt per mobile number.
@@ -207,7 +209,7 @@ async function startExam(){
   }catch(e){ console.warn('[exam] duplicate check unavailable, continuing', e); }
 
   const catLabel = examCategoryLabel(category);
-  currentParticipant = { name, category, phone, whatsapp, email };
+  currentParticipant = { name, category, district, school, phone, whatsapp, email };
   currentCategory = category;
   currentQuestions = await loadQuestionsForCategory(category);
   if(!Array.isArray(currentQuestions) || currentQuestions.length === 0){
@@ -287,6 +289,8 @@ async function submitExam(){
     await window.db.saveExamSubmission({
       name: currentParticipant.name,
       category: currentParticipant.category,
+      district: currentParticipant.district,
+      school: currentParticipant.school,
       phone: currentParticipant.phone,
       whatsapp: currentParticipant.whatsapp,
       email: currentParticipant.email,

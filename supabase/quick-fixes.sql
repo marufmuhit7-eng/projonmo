@@ -168,6 +168,11 @@ create table if not exists public.exam_submissions (
 create index if not exists exam_submissions_rank_idx
   on public.exam_submissions (score desc, created_at asc);
 
+-- নতুন ফর্ম-ঘর: জেলা ও স্কুল (আগের ডেপ্লয়মেন্টে না থাকলে যোগ হবে)
+alter table public.exam_submissions
+  add column if not exists district text not null default '',
+  add column if not exists school   text not null default '';
+
 alter table public.exam_submissions enable row level security;
 
 -- যে কেউ (anon) পরীক্ষা জমা দিতে পারবে

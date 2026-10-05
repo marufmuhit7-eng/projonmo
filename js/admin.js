@@ -402,7 +402,7 @@ function rowCategory(q){
 async function loadAdminQuestions(){
   if(!adminLoggedIn) return;
   const body = document.getElementById('adminQListBody');
-  body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;">… লোড হচ্ছে</td></tr>';
+  body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;">… লোড হচ্ছে</td></tr>';
   try{
     // Load EVERYTHING once; the dropdown filters client-side.
     adminQuestionsCache = await window.db.listAllQuestions();
@@ -410,7 +410,7 @@ async function loadAdminQuestions(){
     renderAdminQList();
   }catch(err){
     console.error(err);
-    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;">লোড করা যায়নি — ' + escapeHtml(err.message) + '</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;">লোড করা যায়নি — ' + escapeHtml(err.message) + '</td></tr>';
   }
 }
 
@@ -442,12 +442,12 @@ function renderAdminQList(){
   const sel = document.getElementById('qFilterCat');
   const filter = sel ? sel.value : 'all';
   if(!window.db.active){
-    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;">⚠️ Supabase কনফিগার করা নেই — প্রশ্ন ডেটাবেসে সেভ হবে না। <code>supabase/SETUP.md</code> দেখো।</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;">⚠️ Supabase কনফিগার করা নেই — প্রশ্ন ডেটাবেসে সেভ হবে না। <code>supabase/SETUP.md</code> দেখো।</td></tr>';
     return;
   }
   const rows = adminQuestionsCache.filter(q => filter==='all' || (q.cat||'(নেই)')===filter);
   if(rows.length === 0){
-    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;">এই ফিল্টারে কোনো প্রশ্ন নেই। (পরীক্ষায় ক্যাটাগরির প্রশ্ন না থাকলে বিল্ট-ইন নমুনা প্রশ্নই দেখাবে; 📄 Sheet সিঙ্ক ট্যাব থেকে আমদানি করো।)</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;">এই ফিল্টারে কোনো প্রশ্ন নেই। (পরীক্ষায় ক্যাটাগরির প্রশ্ন না থাকলে বিল্ট-ইন নমুনা প্রশ্নই দেখাবে; 📄 Sheet সিঙ্ক ট্যাব থেকে আমদানি করো।)</td></tr>';
     return;
   }
   body.innerHTML = '';
@@ -950,14 +950,14 @@ let adminResultsCache = [];
 async function loadAdminLeaderboard(){
   if(!adminLoggedIn) return;
   const body = document.getElementById('adminLbBody');
-  body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;">… লোড হচ্ছে</td></tr>';
+  body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;">… লোড হচ্ছে</td></tr>';
   try{
     adminResultsCache = await window.db.listAdminResults();
     renderAdminResultsTable();
   }catch(err){
     console.error('Error fetching results:', err);
     const denied = /row-level security|permission|jwt|401|403/i.test(String(err.message||''));
-    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;">' +
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;">' +
       (denied
         ? '<span class="bn">🔒 তালিকা পড়ার অনুমতি নেই — উপরের <strong>☁️ আয়োয়ক সাইন-ইন</strong> বক্সে সাইন-ইন করো।</span><span class="en">🔒 Read denied — sign in via the ☁️ box above.</span>'
         : '<span class="bn">তালিকা লোড করা যায়নি: ' + escapeHtml(err.message) + '</span>') +
@@ -965,14 +965,14 @@ async function loadAdminLeaderboard(){
     return;
   }
   if(adminResultsCache.length === 0){
-    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;"><span class="bn">এখনো কেউ পরীক্ষা দেয়নি।</span><span class="en">Nobody has taken the exam yet.</span></td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;"><span class="bn">এখনো কেউ পরীক্ষা দেয়নি।</span><span class="en">Nobody has taken the exam yet.</span></td></tr>';
   }
 }
 
 function renderAdminResultsTable(){
   const body = document.getElementById('adminLbBody');
   if(adminResultsCache.length === 0){
-    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;"><span class="bn">এখনো কেউ পরীক্ষা দেয়নি।</span><span class="en">Nobody has taken the exam yet.</span></td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;"><span class="bn">এখনো কেউ পরীক্ষা দেয়নি।</span><span class="en">Nobody has taken the exam yet.</span></td></tr>';
     return;
   }
   body.innerHTML = '';
@@ -988,6 +988,8 @@ function renderAdminResultsTable(){
     tr.innerHTML = '<td><span class="rank-badge ' + badgeClass + '">' + rank + '</span></td>' +
       '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + (r.code ? escapeHtml(r.code) : '—') + '</td>' +
       '<td>' + escapeHtml(r.name) + (r.category ? ' <span class="small-note" style="font-size:0.72rem;color:rgba(36,28,21,0.55);">· ' + escapeHtml(r.category) + '</span>' : '') + '</td>' +
+      '<td>' + escapeHtml(r.district || '—') + '</td>' +
+      '<td>' + escapeHtml(r.school || '—') + '</td>' +
       '<td><strong>' + r.score + '</strong>' + (r.maxScore ? ' / ' + r.maxScore : '') + '</td>' +
       '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + duration + ' · ' + when + '</td>';
     body.appendChild(tr);
@@ -1002,7 +1004,7 @@ function printAdminResults(){
     const duration = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
     const when = typeof r.submittedAt === 'string' ? r.submittedAt.replace('T', ' ').slice(0, 16) : '—';
     return '<tr><td style="text-align:center;">' + (i + 1) + '</td><td>' + escapeHtml(r.code || '—') + '</td><td>' +
-      escapeHtml(r.name) + '</td><td style="text-align:center;">' + r.score + (r.maxScore ? ' / ' + r.maxScore : '') +
+      escapeHtml(r.name) + '</td><td>' + escapeHtml(r.district || '—') + '</td><td>' + escapeHtml(r.school || '—') + '</td><td style="text-align:center;">' + r.score + (r.maxScore ? ' / ' + r.maxScore : '') +
       '</td><td style="text-align:center;">' + duration + ' · ' + when + '</td></tr>';
   }).join('');
   const w = window.open('', '_blank');
@@ -1014,7 +1016,7 @@ function printAdminResults(){
     'th{background:#f0e7cf;}</style></head><body>' +
     '<h2>মেধাতালিকা — উত্তরবঙ্গ হেরিটেজ ফেস্ট ২০২৬</h2>' +
     '<p>প্রিন্টের তারিখ: ' + new Date().toLocaleString('en-GB') + '</p>' +
-    '<table><thead><tr><th>মেধা ক্রম</th><th>কোড / রেফারেন্স</th><th>পরীক্ষার্থীর নাম</th><th>প্রাপ্ত নম্বর</th><th>সময় / জমা</th></tr></thead>' +
+    '<table><thead><tr><th>মেধা ক্রম</th><th>কোড / রেফারেন্স</th><th>পরীক্ষার্থীর নাম</th><th>জেলা</th><th>স্কুল / প্রতিষ্ঠান</th><th>প্রাপ্ত নম্বর</th><th>সময় / জমা</th></tr></thead>' +
     '<tbody>' + rows + '</tbody></table></body></html>');
   w.document.close();
   w.focus();
@@ -1024,10 +1026,10 @@ function printAdminResults(){
 /** CSV download (Excel-safe Bangla via BOM). */
 function exportAdminResultsCsv(){
   if(adminResultsCache.length === 0){ window.alert('এক্সপোর্ট করার মতো ফলাফল নেই।'); return; }
-  const head = ['মেধা ক্রম', 'কোড / রেফারেন্স', 'নাম', 'প্রাপ্ত নম্বর', 'পূর্ণ নম্বর', 'সময়কাল (সেঃ)', 'জমা দেওয়ার সময়'];
+  const head = ['মেধা ক্রম', 'কোড / রেফারেন্স', 'নাম', 'ক্যাটাগরি', 'জেলা', 'স্কুল / প্রতিষ্ঠান', 'মোবাইল', 'হোয়াটসঅ্যাপ', 'প্রাপ্ত নম্বর', 'পূর্ণ নম্বর', 'সময়কাল (সেঃ)', 'জমা দেওয়ার সময়'];
   const lines = adminResultsCache.map(function(r, i){
     const when = typeof r.submittedAt === 'string' ? r.submittedAt : '';
-    return [i + 1, r.code || '', r.name || '', r.score, r.maxScore || '', r.timeTakenSec || 0, when]
+    return [i + 1, r.code || '', r.name || '', r.category || '', r.district || '', r.school || '', r.phone || '', r.whatsapp || '', r.score, r.maxScore || '', r.timeTakenSec || 0, when]
       .map(function(v){ return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
   });
   const blob = new Blob(['\uFEFF' + head.join(',') + '\n' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });

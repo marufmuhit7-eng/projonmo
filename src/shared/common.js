@@ -225,12 +225,15 @@ function escapeHtml(s){
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-/* ---------- Exam categories (candidate picks one right before the exam) ---------- */
+/* ---------- Exam categories & districts (candidate picks right before the exam) ---------- */
 const EXAM_CATEGORIES = {
-  school:     { bn: 'ক — স্কুল পর্যায়',      en: 'School' },
-  college:    { bn: 'খ — কলেজ পর্যায়',     en: 'College' },
-  university: { bn: 'গ — বিশ্ববিদ্যালয় পর্যায়', en: 'University' }
+  primary: { bn: 'প্রাইমারি (৩য় থেকে ৫ম শ্রেণী)', en: 'Primary (Class 3-5)' },
+  junior:  { bn: 'জুনিয়র (৬ষ্ঠ থেকে ৮ম শ্রেণী)',  en: 'Junior (Class 6-8)' },
+  senior:  { bn: 'সিনিয়র (৯ম থেকে ১০ম শ্রেণী)',   en: 'Senior (Class 9-10)' }
 };
 function examCategoryLabel(cat){
   return EXAM_CATEGORIES[cat] || { bn: cat, en: cat };
 }
+
+/* উত্তরবঙ্গের ৮ জেলা */
+const EXAM_DISTRICTS = ['রংপুর','দিনাজপুর','ঠাকুরগাঁও','পঞ্চগড়','নীলফামারী','লালমনিরহাট','কুড়িগ্রাম','গাইবান্ধা'];

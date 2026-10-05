@@ -186,6 +186,8 @@ create table if not exists public.exam_submissions (
   id              uuid    primary key default gen_random_uuid(),
   name            text    not null,
   category        text    not null,
+  district        text    not null default '',
+  school          text    not null default '',
   phone           text    not null,
   whatsapp        text    default '',
   email           text    default '',

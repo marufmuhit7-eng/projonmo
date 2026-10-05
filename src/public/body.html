@@ -154,7 +154,7 @@
           <li>মোট সময় <strong>১০ মিনিট</strong>। সময় শেষ হলে উত্তরপত্র নিজে থেকেই জমা হয়ে যাবে।</li>
           <li>একই মোবাইল নম্বরে <strong>একবারই</strong> পরীক্ষা দেওয়া যাবে।</li>
           <li>উত্তর সিলেক্ট করার সাথে সাথেই সঠিক/ভুল দেখা যাবে।</li>
-          <li>তোমার ক্যাটাগরি অনুযায়ী প্রশ্ন আসবে — স্কুল, কলেজ বা বিশ্ববিদ্যালয়।</li>
+          <li>তোমার ক্যাটাগরি অনুযায়ী প্রশ্ন আসবে — প্রাইমারি, জুনিয়র বা সিনিয়র।</li>
           <li>জমা দেওয়ার পর ফলাফল সংরক্ষিত হবে।</li>
         </ol>
         <ol class="en" style="margin:0;padding-left:20px;font-size:0.88rem;line-height:1.75;">
@@ -162,7 +162,7 @@
           <li>You get <strong>10 minutes</strong>. The paper submits itself when time runs out.</li>
           <li>Each ID may attempt the exam <strong>once only</strong>.</li>
           <li>Correct or incorrect is shown the moment you pick an answer.</li>
-          <li>Questions match your category — School, College or University.</li>
+          <li>Questions match your category — Primary, Junior or Senior.</li>
           <li>Your score is saved immediately after you submit.</li>
         </ol>
       </div>
@@ -173,15 +173,31 @@
       <label style="margin-top:14px;"><span class="bn">ক্যাটাগরি *</span><span class="en">Category *</span></label>
       <select id="c_category">
         <option value="">— ক্যাটাগরি বেছে নাও —</option>
-        <option value="school">ক — স্কুল পর্যায় (School)</option>
-        <option value="college">খ — কলেজ পর্যায় (College)</option>
-        <option value="university">গ — বিশ্ববিদ্যালয় পর্যায় (University)</option>
+        <option value="primary">প্রাইমারি (৩য় থেকে ৫ম শ্রেণী)</option>
+        <option value="junior">জুনিয়র (৬ষ্ঠ থেকে ৮ম শ্রেণী)</option>
+        <option value="senior">সিনিয়র (৯ম থেকে ১০ম শ্রেণী)</option>
       </select>
+
+      <label style="margin-top:14px;"><span class="bn">জেলা *</span><span class="en">District *</span></label>
+      <select id="c_district">
+        <option value="">— জেলা বেছে নাও —</option>
+        <option value="রংপুর">রংপুর (Rangpur)</option>
+        <option value="দিনাজপুর">দিনাজপুর (Dinajpur)</option>
+        <option value="ঠাকুরগাঁও">ঠাকুরগাঁও (Thakurgaon)</option>
+        <option value="পঞ্চগড়">পঞ্চগড় (Panchagarh)</option>
+        <option value="নীলফামারী">নীলফামারী (Nilphamari)</option>
+        <option value="লালমনিরহাট">লালমনিরহাট (Lalmonirhat)</option>
+        <option value="কুড়িগ্রাম">কুড়িগ্রাম (Kurigram)</option>
+        <option value="গাইবান্ধা">গাইবান্ধা (Gaibandha)</option>
+      </select>
+
+      <label style="margin-top:14px;"><span class="bn">স্কুল / প্রতিষ্ঠান *</span><span class="en">School / Institute *</span></label>
+      <input type="text" id="c_school" placeholder="তোমার স্কুল / প্রতিষ্ঠানের নাম">
 
       <label style="margin-top:14px;"><span class="bn">মোবাইল নম্বর *</span><span class="en">Mobile number *</span></label>
       <input type="tel" id="c_phone" placeholder="01XXXXXXXXX" autocomplete="tel">
 
-      <label style="margin-top:14px;"><span class="bn">হোয়াটসঅ্যাপ নম্বর (ঐচ্ছিক)</span><span class="en">WhatsApp number (optional)</span></label>
+      <label style="margin-top:14px;"><span class="bn">হোয়াটসঅ্যাপ নম্বর *</span><span class="en">WhatsApp number *</span></label>
       <input type="tel" id="c_whatsapp" placeholder="01XXXXXXXXX">
 
       <label style="margin-top:14px;"><span class="bn">ই-মেইল (ঐচ্ছিক)</span><span class="en">Email (optional)</span></label>

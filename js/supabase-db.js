@@ -609,7 +609,7 @@
     if (!active) return Promise.resolve([]);
     function fromSubmissions() {
       return client.from('exam_submissions')
-        .select('name,category,phone,whatsapp,email,score,total_questions,created_at')
+        .select('name,category,district,school,phone,whatsapp,email,score,total_questions,created_at')
         .then(function (res) {
           if (res.error) throw res.error;
           return (res.data || []).map(function (r) {
@@ -617,6 +617,8 @@
               code: '',                        // no reg_code in this flow
               name: r.name || '',
               category: r.category || '',
+              district: r.district || '',
+              school: r.school || '',
               phone: r.phone || '',
               whatsapp: r.whatsapp || '',
               email: r.email || '',
@@ -639,6 +641,7 @@
               code: r.reg_code || r.pid || '',
               name: r.name || '',
               category: r.category || r.cls || '',
+              district: '', school: '',
               phone: '', whatsapp: '', email: '',
               score: r.score || 0,
               maxScore: r.max_score || 0,
@@ -652,7 +655,7 @@
       return listLeaderboard().then(function (rows) {
         return rows.map(function (r) {
           return {
-            code: r.pid || '', name: r.name || '', category: '', phone: '', whatsapp: '', email: '',
+            code: r.pid || '', name: r.name || '', category: '', district: '', school: '', phone: '', whatsapp: '', email: '',
             score: r.score || 0, maxScore: r.maxScore || 0,
             timeTakenSec: r.timeTakenSec || 0, submittedAt: null
           };
@@ -713,12 +716,14 @@
   /** New flow: save the candidate's details + score in one row. */
   function saveExamSubmission(sub) {
     if (!active) return Promise.reject(new Error('Supabase কনফিগার করা নেই'));
-    if (!sub || !sub.name || !sub.category || !sub.phone) {
-      return Promise.reject(new Error('নাম, ক্যাটাগরি ও মোবাইল নম্বর আবশ্যক'));
+    if (!sub || !sub.name || !sub.category || !sub.district || !sub.school || !sub.phone || !sub.whatsapp) {
+      return Promise.reject(new Error('নাম, ক্যাটাগরি, জেলা, স্কুল, মোবাইল ও হোয়াটসঅ্যাপ নম্বর আবশ্যক'));
     }
     return client.from('exam_submissions').insert({
       name: sub.name,
       category: sub.category,
+      district: sub.district,
+      school: sub.school,
       phone: sub.phone,
       whatsapp: sub.whatsapp || '',
       email: sub.email || '',
