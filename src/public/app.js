@@ -151,14 +151,29 @@ window.addEventListener('pagehide', function(){
   stopCountdown();
 });
 
+/**
+ * Category matching for the exam:
+ *   প্রাইমারি (primary)  -> questions where category = 'Primary'
+ *   জুনিয়র  (junior)    -> questions where category = 'Junior'
+ *   সিনিয়র   (senior)    -> questions where category = 'Senior'
+ *
+ * The official seed (supabase/seed-official-questions.sql) stores the
+ * capitalised English names; an admin may also add rows with the lowercase
+ * key. Both are honoured, in order, before falling back to every question
+ * and finally the bundled set.
+ */
 async function loadQuestionsForCategory(catKey){
-  // Supabase first: the participant's own category, then (if that category
-  // has no rows yet — e.g. imported sheet categories) every question mixed,
-  // ordered by category + order_no. The bundled set is the last fallback.
+  const dbCat = catKey ? catKey.charAt(0).toUpperCase() + catKey.slice(1) : catKey;
   try{
-    const remote = await window.db.listQuestions(catKey);
+    const remote = await window.db.listQuestions(catKey);   // lowercase rows (admin-added)
     if(Array.isArray(remote) && remote.length>0) return remote;
-    const all = await window.db.listAllQuestions();
+  }catch(err){ /* try the next spelling */ }
+  try{
+    const remote = await window.db.listQuestions(dbCat);    // official 'Primary'/'Junior'/'Senior'
+    if(Array.isArray(remote) && remote.length>0) return remote;
+  }catch(err){ /* fall through */ }
+  try{
+    const all = await window.db.listAllQuestions();         // last resort before the bundled set
     if(Array.isArray(all) && all.length>0) return all;
   }catch(err){ /* fall back below */ }
   return QUESTIONS[catKey];
