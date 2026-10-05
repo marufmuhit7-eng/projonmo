@@ -28,31 +28,18 @@ SRC = ROOT / "src"
 
 LOGO = "logo.png"
 
-# Typography. Bengali is the primary script here, so it gets a proper pairing
-# rather than one family doing every job:
+# Typography. One family for the entire site: Hind Siliguri (Bangla +
+# Latin) in weights 400/500/600/700, with 700 (bold) as the site default
+# set in styles.css. styles.css also @import's the same sheet as a belt-
+# and-braces measure; browsers deduplicate the identical request.
 #
-#   Noto Serif Bengali  — headings. Contrast and stroke modulation that reads as
-#                         heritage without tipping into decorative.
-#   Noto Sans Bengali   — body. Open counters and a tall x-height, which is what
-#                         keeps দীর্ঘ যুক্তাক্ষর legible at 16px on a phone.
-#   Playfair Display    — English headings, matched to the Bengali serif.
-#   Source Sans 3       — English body, matched to the Bengali sans.
-#
-# Hind Siliguri is gone. Tiro Bangla is kept as a Bengali display FALLBACK only:
-# it has no weight axis, so it cannot render the 600/700 the headings ask for.
-#
-# Weights are requested explicitly. Asking for a weight Google does not serve
-# means the browser synthesises a fake bold, which on Bengali conjuncts smears
-# the joins — the usual cause of "the Bangla looks muddy" on a heritage site.
+# Weights are requested explicitly. Asking for a weight Google does not
+# serve means the browser synthesises a fake bold, which on Bengali
+# conjuncts smears the joins - the usual cause of muddy Bangla.
 FONTS = (
     '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-    '<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@500;600;700'
-    "&family=Noto+Sans+Bengali:wght@400;500;600;700"
-    "&family=Tiro+Bangla:ital@0;1"
-    "&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400;1,600"
-    "&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400"
-    '&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">'
+    '<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">'
 )
 
 # supabase-js is pulled in only when supabase-config.js is filled in, so an

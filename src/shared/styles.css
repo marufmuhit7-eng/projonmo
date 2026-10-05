@@ -1,3 +1,10 @@
+/* Global typography: Hind Siliguri everywhere (weights 400-700), bold
+   (700) as the site default. Every built page also <link>s the same
+   Google Fonts sheet in its <head>; browsers deduplicate the request.
+   If Google Fonts is unreachable the stacks below fall back to a
+   Bengali system font, never to Latin-only Times. */
+@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap');
+
   :root{
     --clay:#A6461E;
     --clay-dark:#752E12;
@@ -30,19 +37,19 @@
     --parchment-hi:#F7EEDA;
     --parchment-lo:#E4D5B0;
     /* ---- Typography -------------------------------------------------
-       Bengali is the primary script, so it gets a real serif/sans pairing
-       instead of one family doing every job. The English families are
-       chosen to match their Bengali partner's weight and contrast, so a
-       bilingual line does not look like two websites spliced together.
+       One family for the whole site: Hind Siliguri (Bangla + Latin,
+       weights 400-700), per the global font update. Display, body and
+       mono stacks all resolve to it, so every element - headings, copy,
+       buttons, timers, codes - renders in Hind Siliguri, bold by default.
 
        Every stack keeps a Bengali fallback ahead of the generic keyword:
        if Google Fonts is blocked, the browser still reaches for a Bengali
        system font rather than dropping to Latin-only Times.            */
-    --f-disp-bn:'Noto Serif Bengali','Tiro Bangla','Playfair Display',serif;
-    --f-disp-en:'Playfair Display','Noto Serif Bengali',serif;
-    --f-body-bn:'Noto Sans Bengali','Source Sans 3',sans-serif;
-    --f-body-en:'Source Sans 3','Noto Sans Bengali',sans-serif;
-    --f-mono:'IBM Plex Mono',monospace;
+    --f-disp-bn:'Hind Siliguri','Noto Sans Bengali',sans-serif;
+    --f-disp-en:'Hind Siliguri','Noto Sans Bengali',sans-serif;
+    --f-body-bn:'Hind Siliguri','Noto Sans Bengali',sans-serif;
+    --f-body-en:'Hind Siliguri','Noto Sans Bengali',sans-serif;
+    --f-mono:'Hind Siliguri','Noto Sans Bengali',sans-serif;
 
     /* Aliases matching the names the brief suggested, so either works. */
     --font-bangla:var(--f-body-bn);
@@ -52,7 +59,7 @@
   *{box-sizing:border-box;}
   /* ---- Global vintage parchment background ---- */
   body{
-    margin:0;color:var(--ink);font-family:var(--f-body-bn),var(--f-body-en);line-height:1.6;
+    margin:0;color:var(--ink);font-family:var(--f-body-bn),var(--f-body-en);font-weight:700;line-height:1.6;
     background-color:var(--parchment);            /* fallback cream, matches the texture */
     background-image:url('../images/vintage-bg.jpg');
     background-size:cover;
@@ -75,13 +82,12 @@
   body.lang-en .bn{display:none;}
   body.lang-bn .en{display:none;}
   /* ---- Headings ----------------------------------------------------
-     Noto Serif Bengali carries more stroke contrast than the old Hind
-     Siliguri, so headings get a slightly tighter line-height: the default
-     1.6 left conspicuous gaps between the matra (মাত্রা) lines. 600 rather
-     than 700 keeps Bengali conjuncts from filling in at display sizes.  */
+     Hind Siliguri is the global family now, bold (700) everywhere per
+     the font update. The slightly tighter line-height stays: the default
+     1.6 left conspicuous gaps between the matra lines.  */
   h1,h2,h3,.disp{
     font-family:var(--f-disp-bn);
-    font-weight:600;
+    font-weight:700;
     line-height:1.32;
     letter-spacing:-0.005em;
   }
@@ -95,9 +101,9 @@
   button{font-family:inherit;cursor:pointer;}
   .wrap{max-width:1080px;margin:0 auto;padding:0 24px;}
 
-  /* Noto Sans Bengali runs optically smaller than Hind Siliguri at an equal
-     px size, so nudge the base up. Layout is unaffected — nothing here is
-     sized in em off the root. */
+  /* Base-size nudge kept from the previous body family: a slightly
+     larger base keeps Bengali conjuncts comfortable on phones. Layout
+     is unaffected - nothing here is sized in em off the root. */
   body.lang-bn{font-size:1.02rem;}
   @media(max-width:600px){
     body.lang-bn{font-size:1rem;line-height:1.8;}
@@ -115,10 +121,10 @@
   .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem;}
   .brand .mark{width:30px;height:30px;flex:0 0 auto;}
   .tabs{display:flex;gap:4px;flex-wrap:wrap;}
-  .tab-btn{background:none;border:none;padding:8px 14px;font-size:0.92rem;color:var(--ink);border-radius:3px;border-bottom:2px solid transparent;transition:all .15s;font-weight:500;}
+  .tab-btn{background:none;border:none;padding:8px 14px;font-size:0.92rem;color:var(--ink);border-radius:3px;border-bottom:2px solid transparent;transition:all .15s;font-weight:700;}
   .tab-btn:hover{background:rgba(181,80,46,0.08);}
   .tab-btn.active{border-bottom:2px solid var(--clay);color:var(--clay-dark);font-weight:700;}
-  .lang-toggle{border:1px solid var(--brass);background:transparent;padding:6px 12px;border-radius:20px;font-size:0.82rem;font-weight:600;color:var(--brass);letter-spacing:.02em;}
+  .lang-toggle{border:1px solid var(--brass);background:transparent;padding:6px 12px;border-radius:20px;font-size:0.82rem;font-weight:700;color:var(--brass);letter-spacing:.02em;}
   .lang-toggle:hover{background:var(--brass);color:var(--cream);}
 
   /* ---- Divider (signature motif) ---- */
@@ -171,7 +177,7 @@
   }
   .hero .sub{
     font-family:var(--f-disp-en);font-style:italic;color:var(--brass-text);
-    font-size:1.15rem;margin-bottom:22px;font-weight:500;
+    font-size:1.15rem;margin-bottom:22px;font-weight:700;
   }
   .hero p.desc{max-width:560px;color:rgba(42,32,21,0.86);font-size:1.02rem;margin-bottom:30px;}
   .hero .eyebrow{color:var(--maroon)!important;}
@@ -259,7 +265,7 @@
   .t-item{position:relative;padding-bottom:32px;}
   .t-item:last-child{padding-bottom:0;}
   .t-item::before{content:'';position:absolute;left:-31px;top:4px;width:14px;height:14px;border-radius:50%;background:var(--clay);border:3px solid var(--cream);}
-  .t-item .t-date{font-family:var(--f-mono);font-size:0.8rem;color:var(--brass-text);font-weight:600;letter-spacing:.03em;}
+  .t-item .t-date{font-family:var(--f-mono);font-size:0.8rem;color:var(--brass-text);font-weight:700;letter-spacing:.03em;}
   .t-item h3{margin:4px 0 4px;font-size:1.05rem;}
   .t-item p{margin:0;font-size:0.9rem;color:rgba(36,28,21,0.7);}
 
@@ -270,7 +276,7 @@
     border:1px solid var(--panel-border);padding:32px;border-radius:3px;
     box-shadow:var(--panel-shadow-lg);
   }
-  label{display:block;font-size:0.85rem;font-weight:600;margin:16px 0 6px;}
+  label{display:block;font-size:0.85rem;font-weight:700;margin:16px 0 6px;}
   label:first-child{margin-top:0;}
   input[type=text],input[type=tel],input[type=email],input[type=password],input[type=number],input[type=date],input[type=datetime-local],textarea,select{
     width:100%;padding:11px 12px;border:1px solid rgba(36,28,21,0.25);border-radius:2px;
@@ -286,7 +292,7 @@
 
   /* ---- Exam ---- */
   .exam-top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid rgba(36,28,21,0.15);}
-  .timer{font-family:var(--f-mono);font-size:1.3rem;font-weight:600;color:var(--clay-dark);background:rgba(181,80,46,0.1);padding:8px 18px;border-radius:2px;}
+  .timer{font-family:var(--f-mono);font-size:1.3rem;font-weight:700;color:var(--clay-dark);background:rgba(181,80,46,0.1);padding:8px 18px;border-radius:2px;}
   .q-card{
     background:var(--panel);
     -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
@@ -294,11 +300,11 @@
     padding:22px;margin-bottom:16px;border-radius:3px;box-shadow:var(--panel-shadow);
   }
   .q-card .qnum{font-family:var(--f-mono);color:var(--brass-text);font-size:0.78rem;letter-spacing:.08em;}
-  .q-card p.qtext{font-weight:600;margin:6px 0 14px;font-size:1.02rem;}
+  .q-card p.qtext{font-weight:700;margin:6px 0 14px;font-size:1.02rem;}
   .opt{display:block;padding:10px 14px;border:1px solid rgba(36,28,21,0.2);border-radius:2px;margin-bottom:8px;cursor:pointer;font-size:0.93rem;transition:all .12s;background:rgba(255,255,255,0.55);}
   .opt:hover{background:rgba(181,80,46,0.06);}
   .opt input{margin-right:10px;}
-  .opt.selected{border-color:var(--clay);background:rgba(181,80,46,0.09);font-weight:600;}
+  .opt.selected{border-color:var(--clay);background:rgba(181,80,46,0.09);font-weight:700;}
   .opt.correct{border-color:var(--sage);background:rgba(107,122,94,0.18);font-weight:700;}
   .opt.incorrect{border-color:var(--clay-dark);background:rgba(181,80,46,0.18);font-weight:700;}
   .opt.locked{pointer-events:none;cursor:default;}
@@ -337,7 +343,7 @@
     border:1px solid var(--panel-border);border-radius:3px;margin-bottom:10px;padding:14px 18px;
     box-shadow:var(--panel-shadow);
   }
-  details.faq summary{cursor:pointer;font-weight:600;font-size:0.95rem;}
+  details.faq summary{cursor:pointer;font-weight:700;font-size:0.95rem;}
   details.faq p{margin:10px 0 0;font-size:0.9rem;color:rgba(36,28,21,0.75);}
 
   footer{background:var(--indigo-deep);color:rgba(241,233,216,0.6);padding:30px 0;font-size:0.82rem;text-align:center;}
@@ -373,7 +379,7 @@
   .contact-ico{flex:0 0 auto;font-size:1.05rem;line-height:1.5;}
   .contact-ico img{width:20px;height:20px;object-fit:contain;display:block;}
   .contact-list a{
-    color:var(--ink);text-decoration:none;font-weight:600;font-size:0.94rem;
+    color:var(--ink);text-decoration:none;font-weight:700;font-size:0.94rem;
     border-bottom:1px solid transparent;transition:color .15s,border-color .15s;
     word-break:break-word;
   }
@@ -383,7 +389,7 @@
   /* Bangla numerals need the mono face to stay evenly spaced. */
   .contact-num{font-family:var(--f-mono);letter-spacing:.02em;}
   .contact-handle{
-    display:block;font-family:var(--f-mono);font-size:0.78rem;font-weight:400;
+    display:block;font-family:var(--f-mono);font-size:0.78rem;font-weight:700;
     color:var(--brass-text);margin-top:2px;
   }
 
@@ -498,7 +504,7 @@
   }
   .sponsor:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(42,32,21,0.15);border-color:var(--brass);}
   .sponsor img{width:96px;height:96px;object-fit:contain;display:block;margin-bottom:14px;}
-  .sponsor span{font-size:0.9rem;font-weight:600;line-height:1.45;}
+  .sponsor span{font-size:0.9rem;font-weight:700;line-height:1.45;}
 
   @media(max-width:700px){
     .people-grid{grid-template-columns:1fr;}
