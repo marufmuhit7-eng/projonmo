@@ -9,6 +9,10 @@
 'use strict';
 
 // --------------------------------------------------------------- the mock
+// Insert-failure simulation shared by the mock and the test body: the mock
+// consults it on every insert; the resilience tests set and reset it.
+const insertSimulation = { missingCols: [], failWith: null };
+
 function makeFakeSupabase() {
   const tables = {
     settings:       new Map(),   // id -> row
@@ -66,7 +70,14 @@ function makeFakeSupabase() {
         return { data: state.single ? (data[0] || null) : data, error: null };
       }
       if (op === 'insert') {
-        (Array.isArray(payload) ? payload : [payload]).forEach(function (r) {
+        // Test hooks: simulate insert failures (RLS / missing columns).
+        if (insertSimulation.failWith) return { data: null, error: insertSimulation.failWith };
+        const rowsIn = Array.isArray(payload) ? payload : [payload];
+        const miss = insertSimulation.missingCols.filter(function (c) {
+          return table === 'exam_submissions' && rowsIn.some(function (r) { return c in r; });
+        })[0];
+        if (miss) return { data: null, error: { code: '42703', message: 'column exam_submissions.' + miss + ' does not exist' } };
+        rowsIn.forEach(function (r) {
           const id = r.id || 'auto-' + (++autoId);
           // column defaults the real Postgres table would apply
           const defaults = table === 'registrations'
@@ -379,6 +390,44 @@ function check(label, cond, detail) {
     results[0].name === 'সালমা' && results[0].score === 90 && results[0].category === 'primary' && results[0].district === 'রংপুর' && results[0].school === 'স্কুল' && results[0].maxScore === 100, results[0]);
   check('admin results: legacy registration row keeps its reg_code and timing',
     results[1].code === 'UHF000001' && results[1].score === 80 && results[1].timeTakenSec === 320, results[1]);
+
+  // ---- submission payload fallbacks + missing-column resilience ---------
+  // Live incident 2026-10-06: the organiser's exam_submissions table was
+  // created before district/school existed, so every insert failed 42703.
+  // The save must degrade (drop the missing columns, keep the row) instead
+  // of losing the submission.
+  insertSimulation.missingCols = ['district', 'school'];
+  const savedK = await db.saveExamSubmission({
+    name: 'করিম', category: 'Junior', district: 'রংপুর', institute: 'আদর্শ বিদ্যালয়',
+    mobile: '01933112244', score: 150
+  });
+  check('submission survives a table still missing district/school',
+    savedK.droppedColumns.indexOf('district') !== -1 &&
+    savedK.droppedColumns.indexOf('school') !== -1 &&
+    !('district' in savedK.row) && !('school' in savedK.row), savedK);
+  check('resilient submission reads back by phone',
+    (await db.findSubmissionByPhone('01933112244')) === true);
+  insertSimulation.missingCols = [];
+  // Field-variant fallbacks (institute/mobile spellings) against a full table.
+  const savedL = await db.saveExamSubmission({
+    name: 'লাবিবা', category: 'Senior', district: 'ঠাকুরগাঁও', institute: 'আদর্শ বিদ্যালয়',
+    mobile: '01799887766', score: 0
+  });
+  check('submission fallbacks: institute→school, mobile→phone+whatsapp, 20 default',
+    savedL.row.school === 'আদর্শ বিদ্যালয়' && savedL.row.phone === '01799887766' &&
+    savedL.row.whatsapp === '01799887766' && savedL.row.total_questions === 20 &&
+    savedL.row.score === 0 && savedL.row.district === 'ঠাকুরগাঁও', savedL.row);
+  insertSimulation.failWith = { code: '42501',
+    message: 'new row violates row-level security policy for table "exam_submissions"' };
+  let permErr = null;
+  try {
+    await db.saveExamSubmission({ name: 'x', category: 'primary', district: 'দিনাজপুর',
+      school: 's', phone: '01622113344', whatsapp: '01622113344' });
+  } catch (e) { permErr = e; }
+  check('RLS failure reports the code and the SQL to run',
+    !!permErr && /quick-fixes/.test(permErr.message) && permErr.message.indexOf('42501') !== -1,
+    permErr && permErr.message);
+  insertSimulation.failWith = null;
 
   // ---- team photo upload (Storage) -----------------------------------------
   const up1 = await db.uploadTeamPhoto({ type: 'image/png', size: 1024, name: 'photo.PNG' });

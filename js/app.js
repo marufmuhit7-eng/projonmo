@@ -300,30 +300,48 @@ async function submitExam(){
   currentQuestions.forEach((q,i)=>{ if(userAnswers[i]===q.correct) score += 10; });
   const maxScore = currentQuestions.length*10;
   const timeTakenSec = Math.round((Date.now()-examStartTime)/1000);
+  // Clean payload with fallbacks for every field variant (school/institute,
+  // phone/mobile, whatsapp→phone) so the row always matches the
+  // exam_submissions columns.
+  const candidateData = currentParticipant || {};
+  const payload = {
+    name: candidateData.name || '',
+    category: candidateData.category || '',
+    district: candidateData.district || '',
+    school: candidateData.school || candidateData.institute || '',
+    phone: candidateData.phone || candidateData.mobile || '',
+    whatsapp: candidateData.whatsapp || candidateData.phone || candidateData.mobile || '',
+    email: candidateData.email || '',
+    score: score || 0,
+    totalQuestions: currentQuestions.length || 20
+  };
+  let saveInfo = null;
   try{
-    await window.db.saveExamSubmission({
-      name: currentParticipant.name,
-      category: currentParticipant.category,
-      district: currentParticipant.district,
-      school: currentParticipant.school,
-      phone: currentParticipant.phone,
-      whatsapp: currentParticipant.whatsapp,
-      email: currentParticipant.email,
-      score: score,
-      totalQuestions: currentQuestions.length
-    });
+    saveInfo = await window.db.saveExamSubmission(payload);
   }catch(err){
-    console.error('Failed to save exam submission', err);
+    // Detailed diagnostics: the full PostgREST/Postgres error in the
+    // console, code + message on screen so the organiser can act on it.
+    console.error('[exam] সাবমিশন সেভ ব্যর্থ।', {
+      code: err && err.code, message: err && err.message,
+      details: err && err.details, hint: err && err.hint, error: err
+    });
     document.getElementById('examBody').classList.add('hidden');
     document.getElementById('examResult').classList.remove('hidden');
     document.getElementById('resultScoreBox').textContent = `${score} / ${maxScore}`;
     const note = document.getElementById('examResult').querySelector('p.bn');
-    if(note) note.textContent = '⚠️ ফলাফল সেভ করা যায়নি (' + (err.message || 'নেটওয়ার্ক সমস্যা') + ') — অনুগ্রহ করে আয়োজকদের জানাও।';
+    const diag = ((err && err.code) ? err.code + ' — ' : '') + ((err && err.message) || 'নেটওয়ার্ক সমস্যা');
+    if(note) note.textContent = '⚠️ ফলাফল সেভ করা যায়নি (' + diag + ') — অনুগ্রহ করে আয়োয়কদের জানাও।';
     return;
   }
   document.getElementById('examBody').classList.add('hidden');
   document.getElementById('examResult').classList.remove('hidden');
   document.getElementById('resultScoreBox').textContent = `${score} / ${maxScore}`;
+  if (saveInfo && Array.isArray(saveInfo.droppedColumns) && saveInfo.droppedColumns.length) {
+    // Saved, but the live table is still missing some columns (run §৭).
+    console.warn('[exam] সেভ হয়েছে, কিন্তু টেবিলে না থাকায় বাদ পড়েছে:', saveInfo.droppedColumns);
+    const note = document.getElementById('examResult').querySelector('p.bn');
+    if (note) note.textContent = '⚠️ ফলাফল সেভ হয়েছে, তবে কিছু তথ্য (' + saveInfo.droppedColumns.join(', ') + ') সেভ হয়নি — আয়োয়কদের জানাও।';
+  }
 }
 
 /* ---------- Team (dynamic from Supabase, falls back to the shipped markup) ---------- */

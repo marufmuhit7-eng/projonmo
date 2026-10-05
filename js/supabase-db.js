@@ -714,31 +714,82 @@
   }
 
   /** New flow: save the candidate's details + score in one row. */
-  function saveExamSubmission(sub) {
-    if (!active) return Promise.reject(new Error('Supabase কনফিগার করা নেই'));
-    if (!sub || !sub.name || !sub.category || !sub.district || !sub.school || !sub.phone || !sub.whatsapp) {
-      return Promise.reject(new Error('নাম, ক্যাটাগরি, জেলা, স্কুল, মোবাইল ও হোয়াটসঅ্যাপ নম্বর আবশ্যক'));
-    }
-    return client.from('exam_submissions').insert({
-      name: sub.name,
-      category: sub.category,
-      district: sub.district,
-      school: sub.school,
-      phone: sub.phone,
-      whatsapp: sub.whatsapp || '',
-      email: sub.email || '',
-      score: sub.score || 0,
-      total_questions: sub.totalQuestions || 0
-    }).then(function (res) {
-      if (res.error) throw res.error;
-    }).catch(function (err) {
-      if (missingColumn(err)) {
-        throw new Error('exam_submissions টেবিল এখনো নেই — Supabase SQL Editor-এ supabase/quick-fixes.sql চালাও');
-      }
-      throw err;
-    });
+  /** One readable diagnostic line from a Postgres/PostgREST error:
+      code, message, details and hint - everything needed to act on it. */
+  function describeSubmissionError(err) {
+    var parts = [];
+    if (err && err.code) parts.push(String(err.code));
+    if (err && err.message) parts.push(String(err.message));
+    if (err && err.details) parts.push('details: ' + err.details);
+    if (err && err.hint) parts.push('hint: ' + err.hint);
+    return parts.join(' — ') || String(err);
   }
 
+  /** The column a 42703 / PGRST204 error complains about, else null. */
+  function missingColumnOf(err) {
+    var msg = String((err && err.message) || '');
+    var m = msg.match(/column\s+(?:[\w]+\.)?([a-z_]+)\s+does not exist/i) ||
+            msg.match(/Could not find the '([a-z_]+)' column/i);
+    return m ? m[1].toLowerCase() : null;
+  }
+
+  function saveExamSubmission(sub) {
+    if (!active) return Promise.reject(new Error('Supabase কনফিগার করা নেই'));
+    sub = sub || {};
+    // Clean payload for .from('exam_submissions').insert([payload]) with
+    // fallbacks for every field variant: school/institute, phone/mobile,
+    // whatsapp→phone. total_questions defaults to the official 20.
+    var payload = {
+      name: sub.name || '',
+      category: sub.category || '',
+      district: sub.district || '',
+      school: sub.school || sub.institute || '',
+      phone: sub.phone || sub.mobile || '',
+      whatsapp: sub.whatsapp || sub.phone || sub.mobile || '',
+      email: sub.email || '',
+      score: sub.score || 0,
+      total_questions: sub.totalQuestions || sub.total_questions || 20
+    };
+    if (!payload.name || !payload.category || !payload.district || !payload.school || !payload.phone || !payload.whatsapp) {
+      return Promise.reject(new Error('নাম, ক্যাটাগরি, জেলা, স্কুল, মোবাইল ও হোয়াটসঅ্যাপ নম্বর আবশ্যক'));
+    }
+    // If the live table is still missing a column (e.g. district/school
+    // before quick-fixes.sql §৭ has been run), drop the named column and
+    // retry - a submission must never be lost over a pending ALTER.
+    var dropped = [];
+    function attempt() {
+      var row = {};
+      Object.keys(payload).forEach(function (k) {
+        if (dropped.indexOf(k) === -1) row[k] = payload[k];
+      });
+      return client.from('exam_submissions').insert([row]).then(function (res) {
+        if (res.error) throw res.error;
+        return { droppedColumns: dropped.slice(), row: row };
+      });
+    }
+    function recover(err) {
+      var col = missingColumnOf(err);
+      if (col && dropped.indexOf(col) === -1) {
+        dropped.push(col);
+        console.warn('[supabase-db] exam_submissions টেবিলে "' + col + '" কলাম নেই — পেলোড থেকে বাদ দিয়ে আবার পাঠানো হচ্ছে। স্থায়ী সমাধান: quick-fixes.sql §৭ চালাও।', err);
+        return attempt().catch(recover);
+      }
+      console.error('[supabase-db] exam_submissions সেভ ব্যর্থ:', err);
+      var msg = describeSubmissionError(err);
+      var code = String((err && (err.code || err.statusCode)) || '');
+      if (code === 'PGRST205' || /could not find the table/i.test(String((err && err.message) || ''))) {
+        throw new Error('exam_submissions টেবিল নেই — Supabase SQL Editor-এ supabase/quick-fixes.sql চালাও (' + msg + ')');
+      }
+      if (missingColumn(err)) {
+        throw new Error('exam_submissions টেবিলে কলাম নেই — quick-fixes.sql §৭-এর ALTER চালাও (' + msg + ')');
+      }
+      if (code === '42501' || code === '401' || code === '403') {
+        throw new Error('Supabase পারমিশন এরর — quick-fixes.sql §৭-এর INSERT পলিসি চালাও (' + msg + ')');
+      }
+      throw new Error('সাবমিশন সেভ ব্যর্থ: ' + msg);
+    }
+    return attempt().catch(recover);
+  }
   // ------------------------------------------------------------------ team
   function rowToTeamMember(r) {
     return {
