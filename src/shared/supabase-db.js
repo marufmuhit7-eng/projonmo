@@ -632,7 +632,7 @@
     }
     function fromRegistrations() {
       return client.from('registrations')
-        .select('reg_code,pid,name,score,max_score,time_taken_sec,submitted_at,created_at,cls,category')
+        .select('reg_code,pid,name,phone,score,max_score,time_taken_sec,submitted_at,created_at,cls,category')
         .eq('exam_taken', true)
         .then(function (res) {
           if (res.error) throw res.error;
@@ -642,7 +642,7 @@
               name: r.name || '',
               category: r.category || r.cls || '',
               district: '', school: '',
-              phone: '', whatsapp: '', email: '',
+              phone: r.phone || '', whatsapp: '', email: '',
               score: r.score || 0,
               maxScore: r.max_score || 0,
               timeTakenSec: r.time_taken_sec || 0,

@@ -950,14 +950,14 @@ let adminResultsCache = [];
 async function loadAdminLeaderboard(){
   if(!adminLoggedIn) return;
   const body = document.getElementById('adminLbBody');
-  body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;">… লোড হচ্ছে</td></tr>';
+  body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;">… লোড হচ্ছে</td></tr>';
   try{
     adminResultsCache = await window.db.listAdminResults();
     renderAdminResultsTable();
   }catch(err){
     console.error('Error fetching results:', err);
     const denied = /row-level security|permission|jwt|401|403/i.test(String(err.message||''));
-    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;">' +
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;">' +
       (denied
         ? '<span class="bn">🔒 তালিকা পড়ার অনুমতি নেই — উপরের <strong>☁️ আয়োয়ক সাইন-ইন</strong> বক্সে সাইন-ইন করো।</span><span class="en">🔒 Read denied — sign in via the ☁️ box above.</span>'
         : '<span class="bn">তালিকা লোড করা যায়নি: ' + escapeHtml(err.message) + '</span>') +
@@ -965,14 +965,14 @@ async function loadAdminLeaderboard(){
     return;
   }
   if(adminResultsCache.length === 0){
-    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;"><span class="bn">এখনো কেউ পরীক্ষা দেয়নি।</span><span class="en">Nobody has taken the exam yet.</span></td></tr>';
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;"><span class="bn">এখনো কেউ পরীক্ষা দেয়নি।</span><span class="en">Nobody has taken the exam yet.</span></td></tr>';
   }
 }
 
 function renderAdminResultsTable(){
   const body = document.getElementById('adminLbBody');
   if(adminResultsCache.length === 0){
-    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;"><span class="bn">এখনো কেউ পরীক্ষা দেয়নি।</span><span class="en">Nobody has taken the exam yet.</span></td></tr>';
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;"><span class="bn">এখনো কেউ পরীক্ষা দেয়নি।</span><span class="en">Nobody has taken the exam yet.</span></td></tr>';
     return;
   }
   body.innerHTML = '';
@@ -988,6 +988,7 @@ function renderAdminResultsTable(){
     tr.innerHTML = '<td><span class="rank-badge ' + badgeClass + '">' + rank + '</span></td>' +
       '<td style="font-family:var(--f-mono);font-size:0.8rem;">' + (r.code ? escapeHtml(r.code) : '—') + '</td>' +
       '<td>' + escapeHtml(r.name) + (r.category ? ' <span class="small-note" style="font-size:0.72rem;color:rgba(36,28,21,0.55);">· ' + escapeHtml(r.category) + '</span>' : '') + '</td>' +
+      '<td style="font-family:var(--f-mono);font-size:0.85rem;">' + escapeHtml(r.phone || r.mobile || '-') + '</td>' +
       '<td>' + escapeHtml(r.district || '—') + '</td>' +
       '<td>' + escapeHtml(r.school || '—') + '</td>' +
       '<td><strong>' + r.score + '</strong>' + (r.maxScore ? ' / ' + r.maxScore : '') + '</td>' +
